@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import json
@@ -9,8 +9,98 @@ from app.models.chat import ChatSession, ChatMessage, get_db
 from app.services.vector_store import search_documents
 from app.services.llm import generate_chat_response
 from app.api.schemas.chat import ChatRequest, ChatResponse, ChatHistoryResponse
+from app.services.llm import LLMService
+from app.services.vector_store import VectorStore
+from app.core.config import settings
+import traceback
 
 router = APIRouter()
+
+# Simple health check endpoint
+@router.get("/")
+async def root():
+    """
+    Simple root endpoint to verify the API is running
+    """
+    return {
+        "message": "Personal Knowledge Base API is running",
+        "status": "ok",
+        "version": "1.0.0"
+    }
+
+# Health check endpoint
+@router.get("/health")
+async def health_check():
+    """
+    Health check endpoint to verify the application and its dependencies are working
+    """
+    health_status = {
+        "status": "healthy",
+        "timestamp": None,
+        "version": "1.0.0",
+        "services": {
+            "database": "unknown",
+            "vector_store": "unknown",
+            "llm": "unknown"
+        },
+        "environment": {
+            "debug": settings.DEBUG,
+            "llm_provider": settings.LLM_PROVIDER,
+            "qdrant_url": settings.QDRANT_URL,
+            "qdrant_api_key_set": bool(settings.QDRANT_API_KEY),
+            "notion_token_set": bool(settings.NOTION_TOKEN),
+            "openrouter_api_key_set": bool(settings.OPENROUTER_API_KEY)
+        }
+    }
+    
+    try:
+        from datetime import datetime
+        health_status["timestamp"] = datetime.utcnow().isoformat()
+    except:
+        pass
+    
+    # Check database connection
+    try:
+        db = next(get_db())
+        # Try a simple query
+        db.execute("SELECT 1")
+        db.close()
+        health_status["services"]["database"] = "healthy"
+    except Exception as e:
+        health_status["services"]["database"] = f"unhealthy: {str(e)}"
+        health_status["status"] = "degraded"
+    
+    # Check vector store connection
+    try:
+        vector_store = VectorStore()
+        # Try to get collection info
+        collections = vector_store.client.get_collections()
+        health_status["services"]["vector_store"] = "healthy"
+    except Exception as e:
+        health_status["services"]["vector_store"] = f"unhealthy: {str(e)}"
+        health_status["status"] = "degraded"
+    
+    # Check LLM service
+    try:
+        llm_service = LLMService()
+        # Try a simple test call
+        test_response = llm_service.generate_response("test", [])
+        if test_response:
+            health_status["services"]["llm"] = "healthy"
+        else:
+            health_status["services"]["llm"] = "unhealthy: no response"
+            health_status["status"] = "degraded"
+    except Exception as e:
+        health_status["services"]["llm"] = f"unhealthy: {str(e)}"
+        health_status["status"] = "degraded"
+    
+    # Return appropriate HTTP status
+    if health_status["status"] == "healthy":
+        return health_status
+    elif health_status["status"] == "degraded":
+        return health_status
+    else:
+        raise HTTPException(status_code=503, detail=health_status)
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(

@@ -48,7 +48,17 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "message": "Personal Knowledgebase Chatbot API is running",
+        "version": "1.0.0",
+        "endpoints": {
+            "chat": "/api/v1/chat",
+            "upload": "/api/v1/upload",
+            "notion": "/api/v1/notion",
+            "detailed_health": "/api/v1/health"
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn
