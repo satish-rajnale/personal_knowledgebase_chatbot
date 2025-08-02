@@ -34,7 +34,7 @@ RUN find /usr/local/lib/python3.11 -name "*.pyc" -delete && \
     find /usr/local/lib/python3.11 -name "__pycache__" -type d -delete
 
 # Expose port
-EXPOSE 8000
+EXPOSE $PORT
 
 # Use startup script
 CMD ["./start.sh"] 

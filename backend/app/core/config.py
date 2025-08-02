@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     # App Configuration
     DEBUG: bool = True
     CORS_ORIGINS: str = "http://localhost:3000"
-    API_HOST: str = "0.0.0.0"
-    API_PORT: int = 8000
+    API_HOST: str = "0.0.0.0"  # Bind to all interfaces for Railway
+    API_PORT: int = int(os.environ.get("PORT", 8000))  # Use Railway's PORT or default to 8000
     
     # File Upload
     MAX_FILE_SIZE: int = 10485760  # 10MB
@@ -40,6 +40,8 @@ settings = Settings()
 
 # Debug: Print configuration (without sensitive data)
 print(f"🔧 Configuration loaded:")
+print(f"   API_HOST: {settings.API_HOST}")
+print(f"   API_PORT: {settings.API_PORT}")
 print(f"   QDRANT_URL: {settings.QDRANT_URL}")
 print(f"   QDRANT_API_KEY: {'Set' if settings.QDRANT_API_KEY else 'Not set'}")
 print(f"   QDRANT_COLLECTION_NAME: {settings.QDRANT_COLLECTION_NAME}")

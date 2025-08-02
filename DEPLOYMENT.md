@@ -1,171 +1,177 @@
-# 🚀 Deployment Guide
+# Deployment Guide
 
-This guide will help you deploy your Personal Knowledgebase Chatbot for free.
+This guide will help you deploy your Personal Knowledgebase Chatbot to free cloud platforms.
 
-## 📋 Prerequisites
+## Architecture
 
-1. **GitHub Account** - Your code should be in a GitHub repository
-2. **Railway Account** - For backend deployment (free tier)
-3. **Vercel Account** - For frontend deployment (free tier)
-4. **Qdrant Cloud Account** - For vector database (free tier)
+- **Backend (FastAPI)**: Railway
+- **Frontend (React)**: Vercel  
+- **Vector Database**: Qdrant Cloud
+- **Port Configuration**: Dynamic (uses Railway's PORT environment variable)
 
-## 🎯 Step-by-Step Deployment
+## Backend Deployment (Railway)
 
-### 1. Backend Deployment (Railway)
+### 1. Prepare Your Repository
 
-#### Step 1: Sign up for Railway
+Ensure your repository has the following files:
+- `Dockerfile.optimized` - Multi-stage Docker build
+- `railway.toml` - Railway configuration
+- `.railwayignore` - Files to exclude from Railway build
+- `backend/` - Your FastAPI application
 
-- Go to [railway.app](https://railway.app)
-- Sign up with your GitHub account
-- Get $5 free credit monthly
+### 2. Deploy to Railway
 
-#### Step 2: Deploy Backend
+1. **Sign up/Login**: Go to [Railway](https://railway.app) and sign up with GitHub
+2. **Create Project**: Click "New Project" → "Deploy from GitHub repo"
+3. **Select Repository**: Choose your personal knowledgebase repository
+4. **Deploy**: Railway will automatically detect the Dockerfile and deploy
 
-1. Click "New Project" → "Deploy from GitHub repo"
-2. Select your repository
-3. Railway will auto-detect the Dockerfile in `backend/`
-4. Add environment variables:
-   ```
-   OPENROUTER_API_KEY=your_openrouter_key
-   NOTION_TOKEN=your_notion_token
-   NOTION_DATABASE_ID=your_page_id
-   QDRANT_URL=https://your-qdrant-cluster.qdrant.io
-   QDRANT_COLLECTION_NAME=knowledgebase
-   CORS_ORIGINS=https://your-frontend-domain.vercel.app
-   ```
+### 3. Configure Environment Variables
 
-#### Step 3: Get Backend URL
+In Railway dashboard, go to your service → Variables tab and add:
 
-- Railway will provide a URL like: `https://your-app.railway.app`
-- Save this URL for frontend configuration
+```bash
+# Qdrant Cloud Configuration
+QDRANT_URL=https://your-cluster-id.qdrant.io
+QDRANT_API_KEY=your_qdrant_api_key
 
-### 2. Vector Database (Qdrant Cloud)
+# LLM Configuration  
+OPENROUTER_API_KEY=your_openrouter_api_key
 
-#### Step 1: Sign up for Qdrant Cloud
+# Notion Integration
+NOTION_TOKEN=your_notion_token
+NOTION_DATABASE_ID=your_notion_page_id
 
-- Go to [cloud.qdrant.io](https://cloud.qdrant.io)
-- Sign up for free tier
-- Create a new cluster
-
-#### Step 2: Configure Qdrant
-
-1. Get your cluster URL and API key
-2. Update backend environment variables:
-   ```
-   QDRANT_URL=https://your-cluster.qdrant.io
-   QDRANT_API_KEY=your_qdrant_api_key
-   ```
-
-### 3. Frontend Deployment (Vercel)
-
-#### Step 1: Sign up for Vercel
-
-- Go to [vercel.com](https://vercel.com)
-- Sign up with your GitHub account
-
-#### Step 2: Deploy Frontend
-
-1. Click "New Project" → "Import Git Repository"
-2. Select your repository
-3. Configure build settings:
-   - **Framework Preset**: Create React App
-   - **Root Directory**: `frontend`
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `build`
-
-#### Step 3: Configure Environment Variables
-
-Add these environment variables in Vercel:
-
-```
-REACT_APP_API_URL=https://your-backend-url.railway.app
-```
-
-#### Step 4: Deploy
-
-- Click "Deploy"
-- Vercel will build and deploy your React app
-- You'll get a URL like: `https://your-app.vercel.app`
-
-### 4. Update Configuration
-
-#### Update Backend CORS
-
-In Railway, update the `CORS_ORIGINS` environment variable:
-
-```
+# App Configuration
+DEBUG=false
 CORS_ORIGINS=https://your-frontend-domain.vercel.app
 ```
 
-#### Update Frontend API URL
+### 4. Railway Configuration
 
-In Vercel, ensure `REACT_APP_API_URL` points to your Railway backend:
+The `railway.toml` file configures:
+- **Health checks**: Uses `/health` endpoint
+- **Port**: Automatically uses Railway's `PORT` environment variable
+- **Restart policy**: Automatic restart on failure
 
+## Frontend Deployment (Vercel)
+
+### 1. Prepare Frontend
+
+Ensure your frontend has:
+- `vercel.json` - Vercel configuration
+- Updated API URL in environment variables
+
+### 2. Deploy to Vercel
+
+1. **Sign up/Login**: Go to [Vercel](https://vercel.com) and sign up with GitHub
+2. **Import Project**: Click "New Project" → Import your repository
+3. **Configure**: 
+   - Framework Preset: `Create React App`
+   - Root Directory: `frontend`
+   - Build Command: `npm run build`
+   - Output Directory: `build`
+
+### 3. Configure Environment Variables
+
+In Vercel dashboard, add:
+```bash
+REACT_APP_API_URL=https://your-railway-app.railway.app
 ```
-REACT_APP_API_URL=https://your-backend-url.railway.app
+
+## Vector Database (Qdrant Cloud)
+
+### 1. Setup Qdrant Cloud
+
+Follow the detailed guide in `QDRANT_SETUP.md`:
+1. Sign up at [Qdrant Cloud](https://cloud.qdrant.io)
+2. Create a free cluster
+3. Get your connection details (URL + API Key)
+
+### 2. Configure Backend
+
+Update Railway environment variables with your Qdrant Cloud details.
+
+## Port Configuration
+
+The application automatically handles dynamic port assignment:
+
+- **Local Development**: Uses port 8000 by default
+- **Railway**: Uses the `PORT` environment variable provided by Railway
+- **Docker**: Exposes port 8000, Railway maps it to their assigned port
+
+### Configuration Files:
+
+- `backend/app/core/config.py`: Reads `PORT` environment variable
+- `backend/main.py`: Uses settings for port configuration
+- `Dockerfile.optimized`: Exposes port 8000
+- `backend/start.sh`: Starts uvicorn with dynamic port
+
+## Testing Deployment
+
+### 1. Test Backend Health
+
+```bash
+# Test Railway deployment
+curl https://your-railway-app.railway.app/health
+
+# Test detailed health
+curl https://your-railway-app.railway.app/api/v1/health
 ```
 
-## 🔧 Alternative Deployment Options
+### 2. Test Frontend
 
-### Render (Backend Alternative)
+Visit your Vercel URL and test:
+- File upload functionality
+- Chat with AI
+- Notion sync
 
-- Go to [render.com](https://render.com)
-- Connect GitHub repository
-- Choose "Web Service"
-- Set build command: `pip install -r requirements.txt`
-- Set start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+### 3. Test Port Configuration
 
-### Netlify (Frontend Alternative)
+```bash
+# Test local port configuration
+python test_port_config.py
 
-- Go to [netlify.com](https://netlify.com)
-- Drag and drop your `frontend/build` folder
-- Or connect GitHub for auto-deployment
+# Test health endpoints
+python test_health.py https://your-railway-app.railway.app
+```
 
-## 🚨 Important Notes
+## Troubleshooting
+
+### Common Issues
+
+1. **Port Binding Issues**
+   - Ensure `API_HOST=0.0.0.0` in configuration
+   - Verify Railway's `PORT` environment variable is set
+
+2. **CORS Errors**
+   - Update `CORS_ORIGINS` in Railway to include your Vercel domain
+   - Ensure frontend `REACT_APP_API_URL` points to Railway
+
+3. **Qdrant Connection Issues**
+   - Verify `QDRANT_URL` and `QDRANT_API_KEY` are set correctly
+   - Check Qdrant Cloud cluster is accessible
+
+4. **Build Failures**
+   - Check Railway logs for build errors
+   - Verify Dockerfile paths are correct
+   - Ensure all required files are present
 
 ### Free Tier Limitations
 
-- **Railway**: $5/month credit (usually sufficient for small apps)
-- **Vercel**: Unlimited deployments, 100GB bandwidth
-- **Qdrant Cloud**: 1GB storage, 1000 requests/day
-- **Render**: Sleeps after 15 minutes of inactivity
+- **Railway**: 500 hours/month, 512MB RAM, 1GB storage
+- **Vercel**: 100GB bandwidth/month, 100 serverless function executions/day
+- **Qdrant Cloud**: 1GB storage, 1000 operations/second
 
-### Environment Variables
+## Monitoring
 
-Make sure to set all required environment variables:
+- **Railway**: Built-in logs and metrics
+- **Vercel**: Analytics and function logs
+- **Health Endpoints**: Use `/health` and `/api/v1/health` for monitoring
 
-- `OPENROUTER_API_KEY` - Your OpenRouter API key
-- `NOTION_TOKEN` - Your Notion integration token
-- `NOTION_DATABASE_ID` - Your Notion page ID
-- `QDRANT_URL` - Your Qdrant cluster URL
-- `CORS_ORIGINS` - Your frontend domain
+## Next Steps
 
-### Database Considerations
-
-- **SQLite**: Works for small apps, but consider PostgreSQL for production
-- **Vector Database**: Qdrant Cloud free tier is sufficient for testing
-
-## 🎉 Success!
-
-After deployment, your app will be available at:
-
-- **Frontend**: `https://your-app.vercel.app`
-- **Backend API**: `https://your-app.railway.app`
-- **API Docs**: `https://your-app.railway.app/docs`
-
-## 🔄 Continuous Deployment
-
-Both Railway and Vercel support automatic deployments:
-
-- Push to your GitHub repository
-- Both platforms will automatically rebuild and deploy
-- No manual intervention needed
-
-## 📞 Support
-
-If you encounter issues:
-
-1. Check the deployment logs in Railway/Vercel
-2. Verify environment variables are set correctly
-3. Test the API endpoints using the `/docs` endpoint
-4. Check CORS configuration if frontend can't connect to backend
+1. Set up monitoring and alerts
+2. Configure custom domains
+3. Implement CI/CD pipelines
+4. Add authentication if needed
