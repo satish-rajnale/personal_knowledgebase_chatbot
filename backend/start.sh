@@ -12,4 +12,4 @@ mkdir -p /app/uploads
 chmod 777 /app/uploads
 
 # Start the application with hot reloading
-exec uvicorn main:app --host 0.0.0.0 --port 8000 --reload 
+exec uvicorn main:app --host 0.0.0.0 --port $PORT --reload 
