@@ -5,10 +5,10 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://your-backend-url.railway.app/api/$1"
+      "destination": "https://peronalknowledgebasechatbot-production.up.railway.app/api/$1"
     }
   ],
   "env": {
-    "REACT_APP_API_URL": "https://your-backend-url.railway.app"
+    "REACT_APP_API_URL": "https://peronalknowledgebasechatbot-production.up.railway.app"
   }
 } 
