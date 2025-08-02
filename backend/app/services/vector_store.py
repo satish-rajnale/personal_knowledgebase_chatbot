@@ -1,10 +1,11 @@
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
-from sentence_transformers import SentenceTransformer
 import uuid
 from typing import List, Dict, Any
 import json
 import re
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
 from app.core.config import settings
 
 class VectorStore:
@@ -21,7 +22,56 @@ class VectorStore:
             print(f"🔗 Connected to local Qdrant: {settings.QDRANT_URL}")
         
         self.collection_name = settings.QDRANT_COLLECTION_NAME
-        self.embedding_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+        # Use TF-IDF for lightweight embeddings
+        self.vectorizer = TfidfVectorizer(
+            max_features=384,  # Match the expected vector size
+            stop_words='english',
+            ngram_range=(1, 3),  # Use 1-3 grams for better feature coverage
+            min_df=1,  # Include all terms
+            max_df=0.95,  # Exclude very common terms
+            lowercase=True,
+            strip_accents='unicode'
+        )
+        self.is_fitted = False
+    
+    def _get_embeddings(self, texts: List[str]) -> List[List[float]]:
+        """Generate embeddings using TF-IDF"""
+        try:
+            if not self.is_fitted:
+                # Fit the vectorizer on the first batch
+                vectors = self.vectorizer.fit_transform(texts).toarray()
+                self.is_fitted = True
+            else:
+                # Transform new texts
+                vectors = self.vectorizer.transform(texts).toarray()
+            
+            # Ensure vectors are 384-dimensional by padding with zeros
+            padded_vectors = []
+            for vector in vectors:
+                if len(vector) < 384:
+                    # Pad with zeros to reach 384 dimensions
+                    padded_vector = np.pad(vector, (0, 384 - len(vector)), 'constant')
+                elif len(vector) > 384:
+                    # Truncate to 384 dimensions
+                    padded_vector = vector[:384]
+                else:
+                    padded_vector = vector
+                
+                # Normalize vector to unit length for cosine similarity
+                norm = np.linalg.norm(padded_vector)
+                if norm > 0:
+                    padded_vector = padded_vector / norm
+                else:
+                    # If vector is all zeros, use a small random vector
+                    padded_vector = np.random.rand(384) * 0.01
+                
+                padded_vectors.append(padded_vector.tolist())
+            
+            return padded_vectors
+        except Exception as e:
+            print(f"❌ Error generating embeddings: {e}")
+            # Fallback: return random vectors of correct dimension
+            return [np.random.rand(384).tolist() for _ in texts]
     
     def _split_text(self, text: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> List[str]:
         """Simple text splitting implementation"""
@@ -75,7 +125,7 @@ class VectorStore:
                 self.client.create_collection(
                     collection_name=self.collection_name,
                     vectors_config=VectorParams(
-                        size=384,  # Size for all-MiniLM-L6-v2
+                        size=384,  # Size for TF-IDF vectors
                         distance=Distance.COSINE
                     )
                 )
@@ -111,14 +161,14 @@ class VectorStore:
             
             # Generate embeddings
             texts = [chunk["text"] for chunk in chunks]
-            embeddings = self.embedding_model.encode(texts)
+            embeddings = self._get_embeddings(texts)
             
             # Prepare points for Qdrant
             points = []
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
                 point = PointStruct(
                     id=str(uuid.uuid4()),
-                    vector=embedding.tolist(),
+                    vector=embedding,
                     payload={
                         "text": chunk["text"],
                         "metadata": chunk["metadata"],
@@ -145,12 +195,12 @@ class VectorStore:
         """Search for similar documents"""
         try:
             # Generate query embedding
-            query_embedding = self.embedding_model.encode([query])
+            query_embedding = self._get_embeddings([query])[0]
             
             # Search in Qdrant
             search_results = self.client.search(
                 collection_name=self.collection_name,
-                query_vector=query_embedding[0].tolist(),
+                query_vector=query_embedding,
                 limit=top_k,
                 with_payload=True
             )

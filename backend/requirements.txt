@@ -18,11 +18,10 @@ pypdf==3.17.4
 markdown==3.5.1
 python-magic==0.4.27
 
-# Embeddings - Use lighter alternative
-sentence-transformers==2.5.1
-# Use CPU-only torch to reduce size
---find-links https://download.pytorch.org/whl/torch_stable.html
-torch==2.1.1+cpu
+# Lightweight embeddings - Use scikit-learn instead of torch
+scikit-learn==1.3.2
+numpy==1.24.3
+# Note: We'll use a simpler embedding approach for now
 
 # Notion Integration
 notion-client==2.2.1
