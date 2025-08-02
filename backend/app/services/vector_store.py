@@ -9,7 +9,17 @@ from app.core.config import settings
 
 class VectorStore:
     def __init__(self):
-        self.client = QdrantClient(settings.QDRANT_URL)
+        # Initialize Qdrant client with API key if available
+        if settings.QDRANT_API_KEY:
+            self.client = QdrantClient(
+                url=settings.QDRANT_URL,
+                api_key=settings.QDRANT_API_KEY
+            )
+            print(f"🔗 Connected to Qdrant Cloud: {settings.QDRANT_URL}")
+        else:
+            self.client = QdrantClient(settings.QDRANT_URL)
+            print(f"🔗 Connected to local Qdrant: {settings.QDRANT_URL}")
+        
         self.collection_name = settings.QDRANT_COLLECTION_NAME
         self.embedding_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
     
@@ -61,17 +71,17 @@ class VectorStore:
             collection_names = [col.name for col in collections.collections]
             
             if self.collection_name not in collection_names:
-                # Create collection
+                # Create collection with proper configuration
                 self.client.create_collection(
                     collection_name=self.collection_name,
                     vectors_config=VectorParams(
-                        size=384,  # all-MiniLM-L6-v2 embedding size
+                        size=384,  # Size for all-MiniLM-L6-v2
                         distance=Distance.COSINE
                     )
                 )
                 print(f"✅ Created Qdrant collection: {self.collection_name}")
             else:
-                print(f"✅ Qdrant collection already exists: {self.collection_name}")
+                print(f"✅ Using existing Qdrant collection: {self.collection_name}")
                 
         except Exception as e:
             print(f"❌ Error initializing Qdrant collection: {e}")

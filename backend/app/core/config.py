@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     
     # Vector Database
     QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_API_KEY: Optional[str] = None
     QDRANT_COLLECTION_NAME: str = "knowledgebase"
     
     # App Configuration
