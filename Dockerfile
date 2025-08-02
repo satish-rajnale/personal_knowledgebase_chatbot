@@ -9,15 +9,15 @@ RUN apt-get update && apt-get install -y \
     libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
+# Copy backend requirements and install Python dependencies
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy startup script
+# Copy backend startup script
 COPY backend/start.sh .
 RUN chmod +x start.sh
 
-# Copy application code
+# Copy backend application code
 COPY backend/ .
 
 # Create uploads directory
