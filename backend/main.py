@@ -59,12 +59,13 @@ async def health_check():
             "detailed_health": "/api/v1/health"
         }
     }
+port = int(os.environ.get("PORT", 8000))
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "main:app",
         host=settings.API_HOST,
-        port=settings.API_PORT,
+        port=port,
         reload=settings.DEBUG
     ) 
