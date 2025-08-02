@@ -53,8 +53,8 @@ frontend/dist/
 *.sqlite3
 chat_history.db
 
-# Uploads
-uploads/
+# Uploads (ignore everything except .gitkeep)
+uploads/*
 !uploads/.gitkeep
 
 # IDE

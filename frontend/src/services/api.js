@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -34,7 +34,7 @@ api.interceptors.response.use(
 export const chatAPI = {
   // Send a message and get response
   sendMessage: async (message, sessionId) => {
-    const response = await api.post('/chat', {
+    const response = await api.post('/api/v1/chat', {
       message,
       session_id: sessionId,
     });
@@ -46,20 +46,20 @@ export const chatAPI = {
     const params = { limit };
     if (sessionId) params.session_id = sessionId;
     
-    const response = await api.get('/chat/history', { params });
+    const response = await api.get('/api/v1/chat/history', { params });
     return response.data;
   },
 
   // Clear chat history
   clearHistory: async (sessionId = null) => {
     const params = sessionId ? { session_id: sessionId } : {};
-    const response = await api.delete('/chat/history', { params });
+    const response = await api.delete('/api/v1/chat/history', { params });
     return response.data;
   },
 
   // Get all sessions
   getSessions: async () => {
-    const response = await api.get('/chat/sessions');
+    const response = await api.get('/api/v1/chat/sessions');
     return response.data;
   },
 };
@@ -70,7 +70,7 @@ export const uploadAPI = {
     const formData = new FormData();
     formData.append('file', file);
     
-    const response = await api.post('/upload', formData, {
+    const response = await api.post('/api/v1/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -85,7 +85,7 @@ export const uploadAPI = {
       formData.append('files', file);
     });
     
-    const response = await api.post('/upload/multiple', formData, {
+    const response = await api.post('/api/v1/upload/multiple', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -97,13 +97,13 @@ export const uploadAPI = {
 export const notionAPI = {
   // Sync Notion database
   syncNotion: async () => {
-    const response = await api.post('/notion/sync');
+    const response = await api.post('/api/v1/notion/sync');
     return response.data;
   },
 
   // Get Notion status
   getStatus: async () => {
-    const response = await api.get('/notion/status');
+    const response = await api.get('/api/v1/notion/status');
     return response.data;
   },
 };

@@ -12,14 +12,14 @@ router = APIRouter()
 async def sync_notion(
     db: Session = Depends(get_db)
 ):
-    """Sync content from Notion database"""
+    """Sync content from Notion page and all its sub-pages"""
     try:
-        # Sync documents from Notion
+        # Sync documents from Notion page and sub-pages
         documents = await sync_notion_database()
         
         if not documents:
             return {
-                "message": "No documents found in Notion database or database is empty",
+                "message": "No content found in Notion page or sub-pages",
                 "documents_synced": 0
             }
         
@@ -27,7 +27,7 @@ async def sync_notion(
         await add_documents_to_store(documents, source_type="notion")
         
         return {
-            "message": f"Successfully synced {len(documents)} documents from Notion",
+            "message": f"Successfully synced {len(documents)} documents from Notion page and sub-pages",
             "documents_synced": len(documents),
             "source": "notion"
         }
@@ -52,11 +52,11 @@ async def notion_status():
         status = {
             "configured": bool(settings.NOTION_TOKEN and settings.NOTION_DATABASE_ID),
             "token_configured": bool(settings.NOTION_TOKEN),
-            "database_configured": bool(settings.NOTION_DATABASE_ID)
+            "page_configured": bool(settings.NOTION_DATABASE_ID)
         }
         
         if not status["configured"]:
-            status["message"] = "Notion integration not fully configured. Please set NOTION_TOKEN and NOTION_DATABASE_ID in your .env file."
+            status["message"] = "Notion integration not fully configured. Please set NOTION_TOKEN and NOTION_DATABASE_ID (page ID) in your .env file."
         else:
             status["message"] = "Notion integration is configured and ready to use."
         

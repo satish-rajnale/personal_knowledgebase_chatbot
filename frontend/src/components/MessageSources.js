@@ -6,8 +6,11 @@ function MessageSources({ sources }) {
 
   if (!sources || sources.length === 0) return null;
 
-  const topSources = sources.slice(0, 2);
-  const remainingSources = sources.slice(2);
+  // Deduplicate sources by URL/page ID
+  const deduplicatedSources = deduplicateSources(sources);
+  
+  const topSources = deduplicatedSources.slice(0, 2);
+  const remainingSources = deduplicatedSources.slice(2);
 
   return (
     <div className="mt-3 border-t pt-3">
@@ -15,10 +18,10 @@ function MessageSources({ sources }) {
         <div className="flex items-center space-x-2">
           <FileText size={14} className="text-gray-500" />
           <span className="text-xs font-medium text-gray-600">
-            Sources ({sources.length})
+            Sources ({deduplicatedSources.length})
           </span>
         </div>
-        {sources.length > 2 && (
+        {deduplicatedSources.length > 2 && (
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="text-xs text-primary-600 hover:text-primary-700 flex items-center space-x-1"
@@ -53,15 +56,108 @@ function MessageSources({ sources }) {
   );
 }
 
+function deduplicateSources(sources) {
+  const seen = new Map();
+  const deduplicated = [];
+
+  sources.forEach(source => {
+    const { url, metadata } = source;
+    
+    // Get the unique identifier for this source
+    const sourceUrl = url || (metadata && metadata.url);
+    const pageId = metadata && metadata.page_id;
+    
+    // Create a unique key based on URL or page ID
+    const uniqueKey = sourceUrl || pageId || `unknown-${Math.random()}`;
+    
+    if (!seen.has(uniqueKey)) {
+      // First time seeing this source
+      seen.set(uniqueKey, {
+        ...source,
+        chunkCount: 1,
+        allChunks: [source]
+      });
+      deduplicated.push(seen.get(uniqueKey));
+    } else {
+      // We've seen this source before, update the existing entry
+      const existing = seen.get(uniqueKey);
+      existing.chunkCount += 1;
+      existing.allChunks.push(source);
+      
+      // Update the text to include content from all chunks
+      const allTexts = existing.allChunks.map(chunk => chunk.text).filter(Boolean);
+      if (allTexts.length > 0) {
+        existing.text = allTexts.slice(0, 2).join(' | '); // Show first 2 chunks
+        if (allTexts.length > 2) {
+          existing.text += ` (+${allTexts.length - 2} more chunks)`;
+        }
+      }
+      
+      // Use the highest relevance score
+      const maxScore = Math.max(...existing.allChunks.map(chunk => chunk.score || 0));
+      existing.score = maxScore;
+    }
+  });
+
+  // Sort by relevance score (highest first)
+  return deduplicated.sort((a, b) => (b.score || 0) - (a.score || 0));
+}
+
 function SourceItem({ source }) {
-  const { text, source: sourceName, score, url } = source;
+  const { text, source: sourceName, score, url, metadata, chunkCount } = source;
+  
+  // Extract URL from metadata if not directly available
+  const sourceUrl = url || (metadata && metadata.url);
+  
+  // Format the source name for display
+  const getDisplayName = () => {
+    if (sourceName && sourceName !== 'Unknown source') {
+      return sourceName;
+    }
+    
+    // Try to extract name from metadata
+    if (metadata) {
+      if (metadata.source && metadata.source !== 'Unknown source') {
+        return metadata.source;
+      }
+      if (metadata.page_id) {
+        return `Notion Page (${metadata.page_id.slice(0, 8)}...)`;
+      }
+    }
+    
+    return 'Unknown source';
+  };
+  
+  // Format the URL for display
+  const getDisplayUrl = () => {
+    if (!sourceUrl) return null;
+    
+    // If it's a Notion URL, format it nicely
+    if (sourceUrl.includes('notion.so')) {
+      const pageId = sourceUrl.split('/').pop();
+      return `notion.so/${pageId}`;
+    }
+    
+    // For other URLs, show the domain
+    try {
+      const urlObj = new URL(sourceUrl);
+      return urlObj.hostname + urlObj.pathname;
+    } catch {
+      return sourceUrl;
+    }
+  };
   
   return (
     <div className="bg-gray-50 rounded p-2 text-xs">
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="font-medium text-gray-700 mb-1">
-            {sourceName || 'Unknown source'}
+          <div className="font-medium text-gray-700 mb-1 flex items-center space-x-2">
+            <span>{getDisplayName()}</span>
+            {chunkCount > 1 && (
+              <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-xs">
+                {chunkCount} chunks
+              </span>
+            )}
           </div>
           <div className="text-gray-600 line-clamp-2">
             {text}
@@ -71,13 +167,27 @@ function SourceItem({ source }) {
               Relevance: {(score * 100).toFixed(1)}%
             </div>
           )}
+          {sourceUrl && (
+            <div className="mt-1">
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary-600 hover:text-primary-700 underline text-xs flex items-center space-x-1"
+                title="Open source"
+              >
+                <ExternalLink size={10} />
+                <span>{getDisplayUrl()}</span>
+              </a>
+            </div>
+          )}
         </div>
-        {url && (
+        {sourceUrl && (
           <a
-            href={url}
+            href={sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-2 text-primary-600 hover:text-primary-700"
+            className="ml-2 text-primary-600 hover:text-primary-700 p-1 rounded hover:bg-gray-100"
             title="Open source"
           >
             <ExternalLink size={12} />

@@ -22,7 +22,7 @@ function Header() {
           
           <div className="flex items-center space-x-4">
             <a
-              href="https://github.com/your-repo/knowledgebase-chatbot"
+              href="https://github.com/satish-rajnale/peronal_knowledgebase_chatbot"
               target="_blank"
               rel="noopener noreferrer"
               className="text-gray-600 hover:text-gray-900 transition-colors duration-200"
