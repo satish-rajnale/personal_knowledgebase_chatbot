@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     NOTION_DATABASE_ID: Optional[str] = None
     
     # Vector Database
-    QDRANT_URL: str = "http://localhost:6333"
-    QDRANT_API_KEY: Optional[str] = None
+    QDRANT_URL: str = "https://6f837ae8-48dc-4769-8c49-deaf34a88382.europe-west3-0.gcp.cloud.qdrant.io"
+    QDRANT_API_KEY: Optional[str] = None  # Set this via environment variable
     QDRANT_COLLECTION_NAME: str = "knowledgebase"
     
     # App Configuration
@@ -37,6 +37,12 @@ class Settings(BaseSettings):
 
 # Create settings instance
 settings = Settings()
+
+# Debug: Print configuration (without sensitive data)
+print(f"🔧 Configuration loaded:")
+print(f"   QDRANT_URL: {settings.QDRANT_URL}")
+print(f"   QDRANT_API_KEY: {'Set' if settings.QDRANT_API_KEY else 'Not set'}")
+print(f"   QDRANT_COLLECTION_NAME: {settings.QDRANT_COLLECTION_NAME}")
 
 # Ensure upload directory exists
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True) 

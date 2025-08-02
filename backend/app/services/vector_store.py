@@ -10,16 +10,33 @@ from app.core.config import settings
 
 class VectorStore:
     def __init__(self):
+        print(f"🔧 VectorStore initialization:")
+        print(f"   QDRANT_URL: {settings.QDRANT_URL}")
+        print(f"   QDRANT_API_KEY: {'Set' if settings.QDRANT_API_KEY else 'Not set'}")
+        print(f"   QDRANT_COLLECTION_NAME: {settings.QDRANT_COLLECTION_NAME}")
+        
         # Initialize Qdrant client with API key if available
         if settings.QDRANT_API_KEY:
-            self.client = QdrantClient(
-                url=settings.QDRANT_URL,
-                api_key=settings.QDRANT_API_KEY
-            )
-            print(f"🔗 Connected to Qdrant Cloud: {settings.QDRANT_URL}")
+            print(f"🔗 Connecting to Qdrant Cloud: {settings.QDRANT_URL}")
+            try:
+                self.client = QdrantClient(
+                    url=settings.QDRANT_URL,
+                    api_key=settings.QDRANT_API_KEY.strip()  # Remove any whitespace
+                )
+                print(f"✅ Connected to Qdrant Cloud: {settings.QDRANT_URL}")
+            except Exception as e:
+                print(f"❌ Failed to connect to Qdrant Cloud: {e}")
+                print(f"   URL: {settings.QDRANT_URL}")
+                print(f"   API Key length: {len(settings.QDRANT_API_KEY) if settings.QDRANT_API_KEY else 0}")
+                raise
         else:
-            self.client = QdrantClient(settings.QDRANT_URL)
-            print(f"🔗 Connected to local Qdrant: {settings.QDRANT_URL}")
+            print(f"🔗 Connecting to local Qdrant: {settings.QDRANT_URL}")
+            try:
+                self.client = QdrantClient(settings.QDRANT_URL)
+                print(f"✅ Connected to local Qdrant: {settings.QDRANT_URL}")
+            except Exception as e:
+                print(f"❌ Failed to connect to local Qdrant: {e}")
+                raise
         
         self.collection_name = settings.QDRANT_COLLECTION_NAME
         # Use TF-IDF for lightweight embeddings

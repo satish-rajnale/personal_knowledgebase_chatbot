@@ -29,7 +29,6 @@ services:
       - ./uploads:/app/uploads
       - database_data:/app/data
     environment:
-      - QDRANT_URL=http://qdrant:6333
       - CORS_ORIGINS=http://localhost:3000
     env_file:
       - .env
