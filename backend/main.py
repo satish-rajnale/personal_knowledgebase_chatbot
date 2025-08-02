@@ -49,7 +49,7 @@ async def root():
 async def health_check():
     """Health check endpoint"""
     return {
-        "status": "healthy",
+        "status": "ok",
         "message": "Personal Knowledgebase Chatbot API is running",
         "version": "1.0.0",
         "endpoints": {
