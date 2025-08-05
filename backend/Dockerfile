@@ -26,5 +26,5 @@ RUN mkdir -p uploads
 # Expose port
 EXPOSE 8000
 
-# Use startup script
+# Use startup script that includes vector store initialization
 CMD ["./start.sh"] 

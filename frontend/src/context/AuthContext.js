@@ -106,10 +106,18 @@ export const AuthProvider = ({ children }) => {
   const refreshUsage = async () => {
     if (token) {
       try {
+        // Dispatch refresh start event
+        window.dispatchEvent(new CustomEvent('usage-refresh-start'));
+        
         const usageStats = await authAPI.getUsageStats();
         setUsage(usageStats);
+        
+        // Dispatch refresh end event
+        window.dispatchEvent(new CustomEvent('usage-refresh-end'));
       } catch (error) {
         console.error('Failed to refresh usage:', error);
+        // Dispatch refresh end event even on error
+        window.dispatchEvent(new CustomEvent('usage-refresh-end'));
       }
     }
   };

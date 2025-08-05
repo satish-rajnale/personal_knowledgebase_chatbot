@@ -12,6 +12,7 @@ from app.models import User, UsageLog, NotionSync, ChatSession, ChatMessage
 from app.api.routes import chat, upload, notion, auth
 from app.core.config import settings
 from app.core.database import init_db
+from app.services.vector_store import vector_store
 
 # Load environment variables
 load_dotenv()
@@ -46,7 +47,21 @@ app.include_router(notion.router, tags=["notion"])
 @app.on_event("startup")
 async def startup_event():
     """Initialize database and vector store on startup"""
+    print("🚀 Starting up application...")
+    
+    # Initialize database
     await init_db()
+    
+    # Initialize vector store with proper indexing
+    try:
+        print("🔧 Initializing vector store...")
+        await vector_store.init_collection()
+        print("✅ Vector store initialized successfully")
+    except Exception as e:
+        print(f"⚠️ Warning: Vector store initialization failed: {e}")
+        print("   The application will continue, but RAG features may not work properly")
+    
+    print("✅ Application startup complete")
 
 @app.get("/")
 async def root():

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChat } from '../context/ChatContext';
+import { useAuth } from '../context/AuthContext';
 import { chatAPI } from '../services/api';
 import { Send, Plus, Trash2, RefreshCw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -7,6 +8,7 @@ import MessageSources from './MessageSources';
 
 function ChatInterface() {
   const { messages, sessionId, isLoading, error, addMessage, setLoading, setError, clearError, newSession } = useChat();
+  const { refreshUsage } = useAuth();
   const [inputMessage, setInputMessage] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -48,6 +50,13 @@ function ChatInterface() {
       };
 
       addMessage(assistantMessage);
+      
+      // Refresh usage stats after successful query
+      try {
+        await refreshUsage();
+      } catch (usageError) {
+        console.warn('Failed to refresh usage stats:', usageError);
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to send message');
     }
@@ -62,6 +71,13 @@ function ChatInterface() {
     try {
       await chatAPI.clearHistory(sessionId);
       newSession();
+      
+      // Refresh usage stats after clearing history
+      try {
+        await refreshUsage();
+      } catch (usageError) {
+        console.warn('Failed to refresh usage stats after clearing history:', usageError);
+      }
     } catch (err) {
       setError('Failed to clear chat history');
     }

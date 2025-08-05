@@ -214,8 +214,9 @@ class NotionService:
             
             # Create document from page properties
             if page_title:
+                page_content = self._extract_page_content(page)
                 doc = {
-                    "page_content": f"Title: {page_title}\n\nContent: {self._extract_page_content(page)}",
+                    "page_content": f"Title: {page_title}\n\nContent: {page_content}",
                     "metadata": {
                         "source": f"Notion Page: {page_title}",
                         "page_id": page_id,
@@ -224,6 +225,9 @@ class NotionService:
                     }
                 }
                 documents.append(doc)
+                print(f"  📄 Created document from page properties: {page_title}")
+                print(f"     Content length: {len(page_content)} characters")
+                print(f"     Content preview: {page_content[:100]}...")
             
             # Process blocks and look for sub-pages
             for block in blocks:
@@ -243,6 +247,7 @@ class NotionService:
                             }
                         }
                         documents.append(doc)
+                        print(f"  📝 Created document from block {block['type']}: {content[:50]}...")
                 
                 # Check for sub-pages (child pages)
                 if block.get("type") == "child_page":

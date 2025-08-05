@@ -156,8 +156,19 @@ async def chat(
         if user:
             # Filter documents by user_id in metadata
             search_filter = {"user_id": user.user_id}
+            print(f"🔍 Searching for user: {user.user_id}")
+        else:
+            print(f"🔍 Searching without user filter (anonymous)")
+        
+        print(f"🔍 Query: {chat_request.message}")
+        print(f"🔍 Search filter: {search_filter}")
         
         relevant_docs = await search_documents(chat_request.message, top_k=5, filter=search_filter)
+        
+        print(f"🔍 Found {len(relevant_docs)} relevant documents")
+        for i, doc in enumerate(relevant_docs):
+            print(f"  📄 Doc {i+1}: {doc.get('metadata', {}).get('source', 'Unknown')} (score: {doc.get('score', 0):.3f})")
+            print(f"     Text: {doc.get('text', '')[:100]}...")
         
         # Generate AI response
         ai_response = await generate_chat_response(chat_request.message, relevant_docs)
@@ -275,13 +286,85 @@ async def get_chat_sessions(db: Session = Depends(get_db)):
     """Get all chat sessions"""
     try:
         sessions = db.query(ChatSession).order_by(ChatSession.updated_at.desc()).all()
-        
-        return [{
-            "session_id": session.session_id,
-            "created_at": session.created_at,
-            "updated_at": session.updated_at,
-            "message_count": len(session.messages)
-        } for session in sessions]
-        
+        return [
+            {
+                "session_id": session.session_id,
+                "user_id": session.user_id,
+                "created_at": session.created_at.isoformat(),
+                "updated_at": session.updated_at.isoformat()
+            }
+            for session in sessions
+        ]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching sessions: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error getting chat sessions: {str(e)}")
+
+@router.get("/debug/vector-store")
+async def debug_vector_store(
+    user: User = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    """Debug endpoint to check vector store contents for a user"""
+    try:
+        if not user:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
+        from app.services.vector_store import vector_store
+        
+        # Get collection info
+        collection_info = vector_store.client.get_collection(vector_store.collection_name)
+        
+        # Search for all documents for this user
+        search_filter = {"user_id": user.user_id}
+        
+        # Get all points for this user (using a dummy query)
+        try:
+            # Use a simple query to get user's documents
+            results = vector_store.client.search(
+                collection_name=vector_store.collection_name,
+                query_vector=[0.0] * 384,  # Dummy vector
+                limit=100,
+                query_filter={
+                    "must": [
+                        {
+                            "key": "user_id",
+                            "match": {"value": user.user_id}
+                        }
+                    ]
+                },
+                with_payload=True
+            )
+            
+            documents = []
+            for result in results:
+                documents.append({
+                    "id": result.id,
+                    "score": result.score,
+                    "payload": result.payload
+                })
+            
+            return {
+                "user_id": user.user_id,
+                "collection_info": {
+                    "name": collection_info.name,
+                    "vectors_count": collection_info.vectors_count,
+                    "points_count": collection_info.points_count
+                },
+                "user_documents_count": len(documents),
+                "documents": documents[:10]  # Return first 10 for debugging
+            }
+            
+        except Exception as e:
+            return {
+                "user_id": user.user_id,
+                "collection_info": {
+                    "name": collection_info.name,
+                    "vectors_count": collection_info.vectors_count,
+                    "points_count": collection_info.points_count
+                },
+                "error": f"Failed to search user documents: {str(e)}",
+                "user_documents_count": 0,
+                "documents": []
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error debugging vector store: {str(e)}") 

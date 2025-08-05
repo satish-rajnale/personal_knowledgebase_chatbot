@@ -1,11 +1,32 @@
-import React, { useState } from 'react';
-import { Brain, Github, User, LogOut } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Brain, Github, User, LogOut, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Modal from './Modal';
 
 function Header() {
   const { user, usage, logout } = useAuth();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isUsageRefreshing, setIsUsageRefreshing] = useState(false);
+
+  // Listen for usage refresh events
+  useEffect(() => {
+    const handleUsageRefreshStart = () => {
+      setIsUsageRefreshing(true);
+    };
+
+    const handleUsageRefreshEnd = () => {
+      setIsUsageRefreshing(false);
+    };
+
+    // Listen for custom events
+    window.addEventListener('usage-refresh-start', handleUsageRefreshStart);
+    window.addEventListener('usage-refresh-end', handleUsageRefreshEnd);
+
+    return () => {
+      window.removeEventListener('usage-refresh-start', handleUsageRefreshStart);
+      window.removeEventListener('usage-refresh-end', handleUsageRefreshEnd);
+    };
+  }, []);
 
   return (
     <header className="bg-white shadow-sm border-b">
@@ -33,7 +54,13 @@ function Header() {
                   <span>{user.email || 'Anonymous'}</span>
                 </div>
                 <div className="flex items-center space-x-1">
-                  <span>{usage.remaining_queries}</span>
+                  {isUsageRefreshing ? (
+                    <RefreshCw className="h-3 w-3 animate-spin text-gray-400" />
+                  ) : (
+                    <span className="transition-all duration-200 ease-in-out">
+                      {usage.remaining_queries}
+                    </span>
+                  )}
                   <span>queries left</span>
                 </div>
               </div>
