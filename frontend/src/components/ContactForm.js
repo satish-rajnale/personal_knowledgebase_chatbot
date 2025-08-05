@@ -182,9 +182,9 @@ const ContactForm = () => {
               Other ways to get help
             </h3>
             <div className="text-sm text-gray-600 space-y-1">
-              <p>• Contact me on <a href="mailto:satishrajnale98@gmail.com">satishrajnale@gmail.com</a></p>
-              <p>• Check my <a href="https://github.com/satishrajnale" target='_blank'>GitHub</a> for updates</p>
-              <p>• Follow me on <a href='https://www.linkedin.com/in/satish-rajnale-676a201b1' target='_blank'>LinkedIn</a> or on my <a href="https://satishrajnale.vercel.app/" target='_blank'>portfolio</a> for updates</p>
+              <p>• Contact me on <a style={{color: 'blue'}} href="mailto:satishrajnale98@gmail.com">satishrajnale@gmail.com</a></p>
+              <p>• Check my <a href="https://github.com/satish-rajnale" target='_blank' style={{color: 'blue'}}>GitHub</a> for updates</p>
+              <p>• Follow me on <a style={{color: 'blue'}} href='https://www.linkedin.com/in/satish-rajnale-676a201b1' target='_blank'>LinkedIn</a> or on my <a href="https://satishrajnale.vercel.app/" target='_blank' style={{color: 'blue'}}>portfolio</a> for updates</p>
             </div>
           </div>
         </div>
