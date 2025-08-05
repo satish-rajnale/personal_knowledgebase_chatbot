@@ -54,7 +54,6 @@ async def health_check():
             "llm_provider": settings.LLM_PROVIDER,
             "qdrant_url": settings.QDRANT_URL,
             "qdrant_api_key_set": bool(settings.QDRANT_API_KEY),
-            "notion_token_set": bool(settings.NOTION_TOKEN),
             "openrouter_api_key_set": bool(settings.OPENROUTER_API_KEY)
         }
     }
