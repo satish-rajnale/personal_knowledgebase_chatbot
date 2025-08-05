@@ -154,7 +154,7 @@ class VectorStore:
             print(f"❌ Error initializing Qdrant collection: {e}")
             raise
     
-    async def add_documents(self, documents: List[Dict], source_type: str = "upload"):
+    async def add_documents(self, documents: List[Dict], source_type: str = "upload", user_id: str = None):
         """Add documents to vector store"""
         try:
             # Split documents into chunks
@@ -162,6 +162,10 @@ class VectorStore:
             for doc in documents:
                 text = doc.get("page_content", "")
                 metadata = doc.get("metadata", {})
+                
+                # Add user_id to metadata if provided
+                if user_id:
+                    metadata["user_id"] = user_id
                 
                 # Split text into chunks
                 text_chunks = self._split_text(text)
@@ -190,7 +194,8 @@ class VectorStore:
                         "text": chunk["text"],
                         "metadata": chunk["metadata"],
                         "source_type": source_type,
-                        "chunk_id": chunk["chunk_id"]
+                        "chunk_id": chunk["chunk_id"],
+                        "user_id": user_id
                     }
                 )
                 points.append(point)
@@ -208,19 +213,39 @@ class VectorStore:
             print(f"❌ Error adding documents to vector store: {e}")
             raise
     
-    async def search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
-        """Search for similar documents"""
+    async def search(self, query: str, top_k: int = 5, filter: Dict = None) -> List[Dict[str, Any]]:
+        """Search for similar documents with optional filtering"""
         try:
             # Generate query embedding
             query_embedding = self._get_embeddings([query])[0]
             
+            # Prepare search parameters
+            search_params = {
+                "collection_name": self.collection_name,
+                "query_vector": query_embedding,
+                "limit": top_k,
+                "with_payload": True
+            }
+            
+            # Add filter if provided
+            if filter:
+                # Convert filter to Qdrant filter format
+                qdrant_filter = None
+                if "user_id" in filter:
+                    qdrant_filter = {
+                        "must": [
+                            {
+                                "key": "user_id",
+                                "match": {"value": filter["user_id"]}
+                            }
+                        ]
+                    }
+                
+                if qdrant_filter:
+                    search_params["query_filter"] = qdrant_filter
+            
             # Search in Qdrant
-            search_results = self.client.search(
-                collection_name=self.collection_name,
-                query_vector=query_embedding,
-                limit=top_k,
-                with_payload=True
-            )
+            search_results = self.client.search(**search_params)
             
             # Format results
             results = []
@@ -245,10 +270,10 @@ async def init_vector_store():
     """Initialize vector store"""
     await vector_store.init_collection()
 
-async def add_documents_to_store(documents: List[Dict], source_type: str = "upload"):
+async def add_documents_to_store(documents: List[Dict], source_type: str = "upload", user_id: str = None):
     """Add documents to vector store"""
-    return await vector_store.add_documents(documents, source_type)
+    return await vector_store.add_documents(documents, source_type, user_id)
 
-async def search_documents(query: str, top_k: int = 5):
+async def search_documents(query: str, top_k: int = 5, filter: Dict = None):
     """Search documents in vector store"""
-    return await vector_store.search(query, top_k) 
+    return await vector_store.search(query, top_k, filter) 

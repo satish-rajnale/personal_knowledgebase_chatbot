@@ -1,18 +1,24 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import json
 import uuid
 from datetime import datetime
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
-from app.models.chat import ChatSession, ChatMessage, get_db
+from app.models.user import User, get_db
+from app.models.chat import ChatSession, ChatMessage
 from app.services.vector_store import search_documents
 from app.services.llm import generate_chat_response
 from app.api.schemas.chat import ChatRequest, ChatResponse, ChatHistoryResponse
 from app.services.llm import LLMService
 from app.services.vector_store import VectorStore
+from app.services.auth import get_current_user_optional, AuthService
 from app.core.config import settings
 import traceback
+
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter()
 
@@ -103,19 +109,35 @@ async def health_check():
         raise HTTPException(status_code=503, detail=health_status)
 
 @router.post("/chat", response_model=ChatResponse)
+@limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def chat(
-    request: ChatRequest,
+    request: Request,
+    chat_request: ChatRequest,
+    user: User = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """Send a message and get AI response with RAG"""
     try:
+        # Check usage limits if user is authenticated
+        auth_service = AuthService()
+        if user:
+            usage = auth_service.check_daily_usage_limit(db, user.user_id)
+            if not usage["can_make_query"]:
+                raise HTTPException(
+                    status_code=429, 
+                    detail=f"Daily query limit exceeded. You have used {usage['daily_query_count']}/{usage['daily_limit']} queries today."
+                )
+        
         # Generate session ID if not provided
-        session_id = request.session_id or str(uuid.uuid4())
+        session_id = chat_request.session_id or str(uuid.uuid4())
         
         # Get or create chat session
         session = db.query(ChatSession).filter(ChatSession.session_id == session_id).first()
         if not session:
-            session = ChatSession(session_id=session_id)
+            session = ChatSession(
+                session_id=session_id,
+                user_id=user.user_id if user else None
+            )
             db.add(session)
             db.commit()
             db.refresh(session)
@@ -124,16 +146,21 @@ async def chat(
         user_message = ChatMessage(
             session_id=session_id,
             role="user",
-            content=request.message
+            content=chat_request.message
         )
         db.add(user_message)
         db.commit()
         
-        # Search for relevant documents
-        relevant_docs = await search_documents(request.message, top_k=5)
+        # Search for relevant documents (user-specific if authenticated)
+        search_filter = None
+        if user:
+            # Filter documents by user_id in metadata
+            search_filter = {"user_id": user.user_id}
+        
+        relevant_docs = await search_documents(chat_request.message, top_k=5, filter=search_filter)
         
         # Generate AI response
-        ai_response = await generate_chat_response(request.message, relevant_docs)
+        ai_response = await generate_chat_response(chat_request.message, relevant_docs)
         
         # Save AI response
         ai_message = ChatMessage(
@@ -153,12 +180,22 @@ async def chat(
         session.updated_at = datetime.utcnow()
         db.commit()
         
+        # Increment usage for authenticated users
+        if user:
+            auth_service.increment_usage(db, user.user_id, "chat", {
+                "message_length": len(chat_request.message),
+                "response_length": len(ai_response),
+                "sources_count": len(relevant_docs)
+            })
+        
         return ChatResponse(
             message=ai_response,
             session_id=session_id,
             sources=relevant_docs
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
 

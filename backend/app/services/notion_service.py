@@ -1,19 +1,101 @@
 from notion_client import Client
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import json
 import re
+import httpx
 from app.core.config import settings
 
 class NotionService:
     """Service for interacting with Notion API"""
     
-    def __init__(self):
-        if not settings.NOTION_TOKEN:
-            raise ValueError("Notion token not configured")
+    def __init__(self, user_token: str):
+        # Only user-specific tokens are supported - no global fallback
+        if not user_token:
+            raise ValueError("User Notion token is required")
+        self.token = user_token
         
-        self.client = Client(auth=settings.NOTION_TOKEN)
-        self.page_id = self._format_page_id(settings.NOTION_DATABASE_ID)  # Using the same env var for page ID
+        self.client = Client(auth=self.token)
         self.synced_pages = set()  # Track synced pages to avoid duplicates
+    
+    async def exchange_code_for_token(self, code: str) -> Dict[str, Any]:
+        """Exchange authorization code for access token"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.notion.com/v1/oauth/token",
+                    auth=(settings.NOTION_CLIENT_ID, settings.NOTION_CLIENT_SECRET),
+                    data={
+                        "grant_type": "authorization_code",
+                        "code": code,
+                        "redirect_uri": settings.NOTION_REDIRECT_URI
+                    }
+                )
+                
+                if response.status_code != 200:
+                    raise Exception(f"OAuth token exchange failed: {response.text}")
+                
+                token_data = response.json()
+                return {
+                    "access_token": token_data["access_token"],
+                    "workspace_id": token_data.get("workspace_id"),
+                    "workspace_name": token_data.get("workspace_name"),
+                    "bot_id": token_data.get("bot_id")
+                }
+                
+        except Exception as e:
+            raise Exception(f"Failed to exchange code for token: {str(e)}")
+    
+    async def get_user_pages(self) -> List[Dict[str, Any]]:
+        """Get all pages accessible to the user"""
+        try:
+            pages = []
+            response = self.client.search(
+                filter={"property": "object", "value": "page"},
+                page_size=100
+            )
+            
+            pages.extend(response["results"])
+            
+            # Handle pagination
+            while response.get("has_more"):
+                response = self.client.search(
+                    filter={"property": "object", "value": "page"},
+                    start_cursor=response["next_cursor"],
+                    page_size=100
+                )
+                pages.extend(response["results"])
+            
+            return pages
+            
+        except Exception as e:
+            print(f"Error getting user pages: {e}")
+            return []
+    
+    async def get_user_databases(self) -> List[Dict[str, Any]]:
+        """Get all databases accessible to the user"""
+        try:
+            databases = []
+            response = self.client.search(
+                filter={"property": "object", "value": "database"},
+                page_size=100
+            )
+            
+            databases.extend(response["results"])
+            
+            # Handle pagination
+            while response.get("has_more"):
+                response = self.client.search(
+                    filter={"property": "object", "value": "database"},
+                    start_cursor=response["next_cursor"],
+                    page_size=100
+                )
+                databases.extend(response["results"])
+            
+            return databases
+            
+        except Exception as e:
+            print(f"Error getting user databases: {e}")
+            return []
     
     def _format_page_id(self, page_id: str) -> str:
         """Format page ID to proper Notion format with hyphens"""
@@ -32,20 +114,23 @@ class NotionService:
         print(f"📝 Formatted page ID: {formatted_id}")
         return formatted_id
     
-    async def sync_page(self) -> List[Dict]:
+    async def sync_page(self, page_id: str) -> List[Dict]:
         """Sync content from a single Notion page and all its sub-pages"""
         try:
-            if not self.page_id:
-                raise ValueError("Notion page ID not configured")
+            if not page_id:
+                raise ValueError("Page ID is required")
             
-            print(f"🔄 Syncing Notion page: {self.page_id}")
+            # Format the page ID
+            formatted_page_id = self._format_page_id(page_id)
+            
+            print(f"🔄 Syncing Notion page: {formatted_page_id}")
             
             # First, verify the page exists and is accessible
             try:
-                page = self.client.pages.retrieve(page_id=self.page_id)
+                page = self.client.pages.retrieve(page_id=formatted_page_id)
                 print(f"✅ Page found: {self._extract_page_title(page)}")
             except Exception as e:
-                raise ValueError(f"Could not access page {self.page_id}. Make sure the page is shared with your integration. Error: {str(e)}")
+                raise ValueError(f"Could not access page {formatted_page_id}. Make sure the page is shared with your integration. Error: {str(e)}")
             
             # Reset synced pages tracking
             self.synced_pages = set()
@@ -60,10 +145,53 @@ class NotionService:
             print(f"❌ Error syncing Notion page: {e}")
             raise
     
-    async def sync_database(self) -> List[Dict]:
-        """Sync all pages from the configured Notion database (for backward compatibility)"""
-        print("⚠️  Using page sync instead of database sync")
-        return await self.sync_page()
+    async def sync_user_pages(self, page_ids: List[str]) -> List[Dict]:
+        """Sync multiple pages for a user"""
+        all_documents = []
+        
+        for page_id in page_ids:
+            try:
+                documents = await self.sync_page(page_id)
+                all_documents.extend(documents)
+            except Exception as e:
+                print(f"❌ Error syncing page {page_id}: {e}")
+                continue
+        
+        return all_documents
+    
+    async def sync_database(self, database_id: str) -> List[Dict]:
+        """Sync all pages from a specific Notion database"""
+        try:
+            if not database_id:
+                raise ValueError("Database ID is required")
+            
+            print(f"🔄 Syncing Notion database: {database_id}")
+            
+            # Query all pages in the database
+            response = self.client.databases.query(database_id=database_id)
+            
+            documents = []
+            for page in response["results"]:
+                page_docs = await self._process_page_recursive(page)
+                documents.extend(page_docs)
+            
+            # Handle pagination
+            while response.get("has_more"):
+                response = self.client.databases.query(
+                    database_id=database_id,
+                    start_cursor=response["next_cursor"]
+                )
+                
+                for page in response["results"]:
+                    page_docs = await self._process_page_recursive(page)
+                    documents.extend(page_docs)
+            
+            print(f"✅ Synced {len(documents)} documents from Notion database")
+            return documents
+            
+        except Exception as e:
+            print(f"❌ Error syncing Notion database: {e}")
+            raise
     
     async def _process_page_recursive(self, page: Dict[str, Any]) -> List[Dict]:
         """Process a single Notion page and all its sub-pages recursively"""
@@ -434,17 +562,7 @@ class NotionService:
             print(f"❌ Error extracting block content: {e}")
             return ""
 
-# Global Notion service instance
-notion_service = None
-
-def get_notion_service() -> NotionService:
-    """Get Notion service instance"""
-    global notion_service
-    if notion_service is None:
-        notion_service = NotionService()
-    return notion_service
-
-async def sync_notion_database() -> List[Dict]:
-    """Sync Notion database and return documents"""
-    service = get_notion_service()
-    return await service.sync_database() 
+# Helper function to create Notion service for a user
+def create_notion_service(user_token: str) -> NotionService:
+    """Create Notion service instance for a specific user"""
+    return NotionService(user_token=user_token) 

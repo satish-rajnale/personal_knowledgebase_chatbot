@@ -1,9 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import os
 from dotenv import load_dotenv
 
-from app.api.routes import chat, upload, notion
+# Import all models to ensure they are registered with SQLAlchemy
+from app.models import User, UsageLog, NotionSync, ChatSession, ChatMessage
+
+from app.api.routes import chat, upload, notion, auth
 from app.core.config import settings
 from app.core.database import init_db
 
@@ -12,10 +18,15 @@ load_dotenv()
 
 # Create FastAPI app
 app = FastAPI(
-    title="Personal Knowledgebase Chatbot",
-    description="AI-powered chatbot for your personal knowledgebase",
-    version="1.0.0"
+    title="AI Knowledge Assistant - Multi-User SaaS",
+    description="AI-powered knowledge assistant with multi-user support, Notion integration, and usage tracking",
+    version="2.0.0"
 )
+
+# Configure rate limiting
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configure CORS
 app.add_middleware(
@@ -27,9 +38,10 @@ app.add_middleware(
 )
 
 # Include API routes
-app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
-app.include_router(upload.router, prefix="/api/v1", tags=["upload"])
-app.include_router(notion.router, prefix="/api/v1", tags=["notion"])
+app.include_router(auth.router, tags=["auth"])
+app.include_router(chat.router, tags=["chat"])
+app.include_router(upload.router, tags=["upload"])
+app.include_router(notion.router, tags=["notion"])
 
 @app.on_event("startup")
 async def startup_event():

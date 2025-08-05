@@ -1,0 +1,9 @@
+# Favicon ICO File
+# This is a placeholder for the favicon.ico file
+# 
+# To create the actual favicon.ico file:
+# 1. Convert the favicon.svg to PNG format (32x32, 16x16, 48x48 sizes)
+# 2. Use an online converter like favicon.io or realfavicongenerator.net
+# 3. Or use ImageMagick: convert favicon.png -resize 16x16,32x32,48x48 favicon.ico
+#
+# For now, the SVG favicon will work in modern browsers 

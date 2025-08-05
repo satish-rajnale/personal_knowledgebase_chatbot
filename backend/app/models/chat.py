@@ -1,11 +1,10 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 from typing import List, Optional
 import os
 
-Base = declarative_base()
+from .base import Base
 
 class ChatSession(Base):
     """Model for chat sessions"""
@@ -13,10 +12,12 @@ class ChatSession(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(String, unique=True, index=True)
+    user_id = Column(String, ForeignKey("users.user_id"), nullable=True)  # Link to user
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Relationship to messages
+    # Relationships
+    user = relationship("User", back_populates="chat_sessions")
     messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
 
 class ChatMessage(Base):

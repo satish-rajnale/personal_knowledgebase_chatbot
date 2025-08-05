@@ -1,7 +1,12 @@
-import React from 'react';
-import { Brain, Github } from 'lucide-react';
+import React, { useState } from 'react';
+import { Brain, Github, User, LogOut } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import Modal from './Modal';
 
 function Header() {
+  const { user, usage, logout } = useAuth();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
   return (
     <header className="bg-white shadow-sm border-b">
       <div className="container mx-auto px-4 py-4">
@@ -12,15 +17,28 @@ function Header() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900">
-                Personal Knowledgebase
+                AI Knowledge Assistant
               </h1>
               <p className="text-sm text-gray-600">
-                AI-powered chatbot for your documents
+                Multi-user SaaS with Notion integration
               </p>
             </div>
           </div>
           
           <div className="flex items-center space-x-4">
+            {user && usage && (
+              <div className="flex items-center space-x-3 text-sm text-gray-600">
+                <div className="flex items-center space-x-1">
+                  <User className="h-4 w-4" />
+                  <span>{user.email || 'Anonymous'}</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <span>{usage.remaining_queries}</span>
+                  <span>queries left</span>
+                </div>
+              </div>
+            )}
+            
             <a
               href="https://github.com/satish-rajnale/peronal_knowledgebase_chatbot"
               target="_blank"
@@ -29,9 +47,45 @@ function Header() {
             >
               <Github className="h-5 w-5" />
             </a>
+            
+            {user && (
+              <button
+                onClick={() => setShowLogoutModal(true)}
+                className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors duration-200"
+                title="Logout"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Logout</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
+      
+      {/* Logout Confirmation Modal */}
+      <Modal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        title="Confirm Logout"
+        message="Are you sure you want to logout? Your session will be cleared and you'll need to log in again."
+        type="warning"
+        showCloseButton={true}
+        actions={[
+          {
+            label: 'Cancel',
+            onClick: () => setShowLogoutModal(false),
+            variant: 'secondary'
+          },
+          {
+            label: 'Logout',
+            onClick: () => {
+              setShowLogoutModal(false);
+              logout();
+            },
+            variant: 'danger'
+          }
+        ]}
+      />
     </header>
   );
 }

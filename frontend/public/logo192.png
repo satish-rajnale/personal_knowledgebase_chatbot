@@ -1,0 +1,9 @@
+# Logo 192x192 PNG File
+# This is a placeholder for the logo192.png file
+# 
+# To create the actual logo192.png file:
+# 1. Convert the favicon.svg to PNG format at 192x192 resolution
+# 2. Use an online converter or image editing software
+# 3. This is used for Apple touch icons and PWA manifest
+#
+# For now, the SVG favicon will work in modern browsers 
