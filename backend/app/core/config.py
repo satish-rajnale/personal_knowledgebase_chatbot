@@ -37,16 +37,17 @@ class Settings(BaseSettings):
     GOOGLE_REDIRECT_URI: Optional[str] = None
     GOOGLE_MOBILE_REDIRECT_URI: Optional[str] = None
     
-    # Vector Database
-    QDRANT_URL: str = "http://qdrant:6333"  # Local Qdrant instance
-    QDRANT_API_KEY: Optional[str] = None  # Not needed for local instance
-    QDRANT_COLLECTION_NAME: str = "knowledgebase"
+    # Vector Database (now using PostgreSQL with pgvector)
+    # QDRANT_URL: str = "http://qdrant:6333"  # Local Qdrant instance
+    # QDRANT_API_KEY: Optional[str] = None  # Not needed for local instance
+    # QDRANT_COLLECTION_NAME: str = "knowledgebase"
     
     # App Configuration
     DEBUG: bool = True
     CORS_ORIGINS: str = "http://localhost:3000,exp://localhost:19000"
     API_HOST: str = "0.0.0.0"  # Bind to all interfaces for Railway
     API_PORT: int = get_port()  # Use Railway's PORT or default to 8000
+    FRONTEND_URL: str = "http://localhost:3000"  # Frontend URL for OAuth redirects
     
     # Authentication
     JWT_SECRET: str = "change-me-in-env"
@@ -57,7 +58,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     
     # Database
-    DATABASE_URL: str = "sqlite:///./chat_history.db"
+    DATABASE_URL: str = "postgresql://user:password@localhost:5432/knowledgebase"
     
     # Email Configuration (for notifications)
     SMTP_HOST: Optional[str] = None
@@ -73,6 +74,9 @@ class Settings(BaseSettings):
     ENABLE_METRICS: bool = True
     ENABLE_TRACING: bool = True
     
+    # File upload settings
+    MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
+    
     class Config:
         env_file = ".env"
         case_sensitive = False
@@ -84,9 +88,8 @@ settings = Settings()
 print(f"🔧 Configuration loaded:")
 print(f"   API_HOST: {settings.API_HOST}")
 print(f"   API_PORT: {settings.API_PORT}")
-print(f"   QDRANT_URL: {settings.QDRANT_URL}")
-print(f"   QDRANT_API_KEY: {'Set' if settings.QDRANT_API_KEY else 'Not set'}")
-print(f"   QDRANT_COLLECTION_NAME: {settings.QDRANT_COLLECTION_NAME}")
+print(f"   DATABASE_URL: {settings.DATABASE_URL}")
+print(f"   Using PostgreSQL with pgvector for vector storage")
 
 # Ensure upload directory exists
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True) 

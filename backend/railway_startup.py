@@ -27,20 +27,21 @@ async def railway_startup():
         await init_db()
         print("✅ Database initialized")
         
-        # Initialize vector store with proper indexing
-        print("🔧 Initializing vector store...")
-        await vector_store.init_collection()
-        print("✅ Vector store initialized with proper indexing")
+        # Initialize PostgreSQL vector store
+        print("🔧 Initializing PostgreSQL vector store...")
+        from app.services.postgres_vector_store import init_vector_store
+        await init_vector_store()
+        print("✅ PostgreSQL vector store initialized with proper indexing")
         
-        # Verify collection exists and has proper configuration
+        # Verify PostgreSQL connection and pgvector extension
         try:
-            collection_info = vector_store.client.get_collection(vector_store.collection_name)
-            print(f"📊 Collection info:")
-            print(f"   Name: {collection_info.name}")
-            print(f"   Vectors: {collection_info.vectors_count}")
-            print(f"   Points: {collection_info.points_count}")
+            from app.services.postgres_vector_store import postgres_vector_store
+            print(f"📊 PostgreSQL vector store info:")
+            print(f"   Database: PostgreSQL with pgvector")
+            print(f"   Extension: pgvector enabled")
+            print(f"   Table: document_chunks")
         except Exception as e:
-            print(f"⚠️ Could not verify collection: {e}")
+            print(f"⚠️ Could not verify PostgreSQL vector store: {e}")
         
         print("\n🎉 Railway startup completed successfully!")
         print("The application is ready to handle requests.")

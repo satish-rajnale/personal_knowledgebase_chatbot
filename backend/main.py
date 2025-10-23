@@ -6,10 +6,23 @@ from slowapi.errors import RateLimitExceeded
 import os
 from dotenv import load_dotenv
 
+# Enable debugpy if DEBUG is true
+if os.getenv("DEBUG", "false").lower() == "true":
+    try:
+        import debugpy
+        debugpy.listen(("0.0.0.0", 5678))
+        print("🔍 Debug server listening on port 5678")
+        if os.getenv("DEBUG_WAIT_FOR_ATTACH", "false").lower() == "true":
+            print("⏳ Waiting for debugger to attach...")
+            debugpy.wait_for_client()
+            print("✅ Debugger attached!")
+    except ImportError:
+        print("⚠️ debugpy not available, debugging disabled")
+
 # Import all models to ensure they are registered with SQLAlchemy
 from app.models import User, UsageLog, NotionSync, ChatSession, ChatMessage
 
-from app.api.routes import chat, upload, notion, auth, google, firebase_auth
+from app.api.routes import chat, upload, notion, auth, google, firebase_auth, pdf_upload
 from app.core.config import settings
 from app.core.database import init_db
 from app.services.vector_store import vector_store
@@ -45,6 +58,7 @@ app.include_router(chat.router, tags=["chat"])
 app.include_router(upload.router, tags=["upload"])
 app.include_router(notion.router, tags=["notion"])
 app.include_router(google.router, tags=["google"])
+app.include_router(pdf_upload.router, tags=["pdf-upload"])
 
 @app.on_event("startup")
 async def startup_event():
@@ -56,9 +70,10 @@ async def startup_event():
     
     # Initialize vector store with proper indexing
     try:
-        print("🔧 Initializing vector store...")
-        await vector_store.init_collection()
-        print("✅ Vector store initialized successfully")
+        print("🔧 Initializing PostgreSQL vector store...")
+        from app.services.postgres_vector_store import init_vector_store
+        await init_vector_store()
+        print("✅ PostgreSQL vector store initialized successfully")
     except Exception as e:
         print(f"⚠️ Warning: Vector store initialization failed: {e}")
         print("   The application will continue, but RAG features may not work properly")

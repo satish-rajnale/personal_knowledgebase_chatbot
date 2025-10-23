@@ -13,7 +13,6 @@ from app.services.vector_store import search_documents
 from app.services.llm import generate_chat_response
 from app.api.schemas.chat import ChatRequest, ChatResponse, ChatHistoryResponse
 from app.services.llm import LLMService
-from app.services.vector_store import VectorStore
 from app.services.auth import get_current_user_optional, AuthService
 from app.core.config import settings
 import traceback
@@ -52,8 +51,7 @@ async def health_check():
         "environment": {
             "debug": settings.DEBUG,
             "llm_provider": settings.LLM_PROVIDER,
-            "qdrant_url": settings.QDRANT_URL,
-            "qdrant_api_key_set": bool(settings.QDRANT_API_KEY),
+            "database_url": settings.DATABASE_URL,
             "openrouter_api_key_set": bool(settings.OPENROUTER_API_KEY)
         }
     }
@@ -78,10 +76,13 @@ async def health_check():
     
     # Check vector store connection
     try:
-        from app.services.vector_store import vector_store
-        # Try to get collection info using the global instance
-        collections = vector_store.client.get_collections()
-        health_status["services"]["vector_store"] = "healthy"
+        from app.services.postgres_vector_store import postgres_vector_store
+        # Just check if the vector store can be instantiated
+        if hasattr(postgres_vector_store, 'embedding_dimensions'):
+            health_status["services"]["vector_store"] = "healthy"
+        else:
+            health_status["services"]["vector_store"] = "unhealthy: missing embedding_dimensions"
+            health_status["status"] = "degraded"
     except Exception as e:
         health_status["services"]["vector_store"] = f"unhealthy: {str(e)}"
         health_status["status"] = "degraded"
@@ -308,46 +309,35 @@ async def debug_vector_store(
         if not user:
             raise HTTPException(status_code=401, detail="Authentication required")
         
-        from app.services.vector_store import vector_store
+        from app.services.postgres_vector_store import search_documents
         
-        # Get collection info
-        collection_info = vector_store.client.get_collection(vector_store.collection_name)
-        
-        # Search for all documents for this user
+        # Search for all documents for this user using PostgreSQL
         search_filter = {"user_id": user.user_id}
         
-        # Get all points for this user (using a dummy query)
+        # Get all documents for this user (using a dummy query)
         try:
             # Use a simple query to get user's documents
-            results = vector_store.client.search(
-                collection_name=vector_store.collection_name,
-                query_vector=[0.0] * 384,  # Dummy vector
-                limit=100,
-                query_filter={
-                    "must": [
-                        {
-                            "key": "user_id",
-                            "match": {"value": user.user_id}
-                        }
-                    ]
-                },
-                with_payload=True
+            results = await search_documents(
+                query="test",  # Dummy query
+                top_k=100,
+                filter=search_filter
             )
             
             documents = []
             for result in results:
                 documents.append({
-                    "id": result.id,
-                    "score": result.score,
-                    "payload": result.payload
+                    "text": result["text"],
+                    "score": result["score"],
+                    "metadata": result["metadata"],
+                    "source_type": result["source_type"]
                 })
             
             return {
                 "user_id": user.user_id,
                 "collection_info": {
-                    "name": collection_info.name,
-                    "vectors_count": collection_info.vectors_count,
-                    "points_count": collection_info.points_count
+                    "name": "document_chunks",
+                    "vectors_count": len(results),
+                    "points_count": len(results)
                 },
                 "user_documents_count": len(documents),
                 "documents": documents[:10]  # Return first 10 for debugging

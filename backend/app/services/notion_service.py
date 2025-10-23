@@ -48,23 +48,49 @@ class NotionService:
     async def get_user_pages(self) -> List[Dict[str, Any]]:
         """Get all pages accessible to the user"""
         try:
-            pages = []
-            response = self.client.search(
-                filter={"property": "object", "value": "page"},
-                page_size=100
-            )
+            print("🔍 Starting get_user_pages...")
+            import asyncio
+            import concurrent.futures
             
+            pages = []
+            loop = asyncio.get_event_loop()
+            
+            def search_pages(start_cursor=None):
+                print(f"🔍 Executing Notion search API call (cursor: {start_cursor})")
+                if start_cursor:
+                    return self.client.search(
+                        filter={"property": "object", "value": "page"},
+                        start_cursor=start_cursor,
+                        page_size=100
+                    )
+                else:
+                    return self.client.search(
+                        filter={"property": "object", "value": "page"},
+                        page_size=100
+                    )
+            
+            print("🔍 Running first search in thread pool...")
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                response = await loop.run_in_executor(executor, search_pages)
+            
+            print(f"✅ First search completed, got {len(response['results'])} pages")
             pages.extend(response["results"])
             
             # Handle pagination
+            page_count = 1
             while response.get("has_more"):
-                response = self.client.search(
-                    filter={"property": "object", "value": "page"},
-                    start_cursor=response["next_cursor"],
-                    page_size=100
-                )
+                print(f"🔍 Running pagination search {page_count + 1}...")
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    response = await loop.run_in_executor(
+                        executor,
+                        search_pages,
+                        response["next_cursor"]
+                    )
+                print(f"✅ Pagination search {page_count + 1} completed, got {len(response['results'])} pages")
                 pages.extend(response["results"])
+                page_count += 1
             
+            print(f"✅ get_user_pages completed, total pages: {len(pages)}")
             return pages
             
         except Exception as e:
@@ -74,21 +100,38 @@ class NotionService:
     async def get_user_databases(self) -> List[Dict[str, Any]]:
         """Get all databases accessible to the user"""
         try:
+            import asyncio
+            import concurrent.futures
+            
             databases = []
-            response = self.client.search(
-                filter={"property": "object", "value": "database"},
-                page_size=100
-            )
+            loop = asyncio.get_event_loop()
+            
+            def search_databases(start_cursor=None):
+                if start_cursor:
+                    return self.client.search(
+                        filter={"property": "object", "value": "database"},
+                        start_cursor=start_cursor,
+                        page_size=100
+                    )
+                else:
+                    return self.client.search(
+                        filter={"property": "object", "value": "database"},
+                        page_size=100
+                    )
+            
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                response = await loop.run_in_executor(executor, search_databases)
             
             databases.extend(response["results"])
             
             # Handle pagination
             while response.get("has_more"):
-                response = self.client.search(
-                    filter={"property": "object", "value": "database"},
-                    start_cursor=response["next_cursor"],
-                    page_size=100
-                )
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    response = await loop.run_in_executor(
+                        executor,
+                        search_databases,
+                        response["next_cursor"]
+                    )
                 databases.extend(response["results"])
             
             return databases
@@ -127,7 +170,16 @@ class NotionService:
             
             # First, verify the page exists and is accessible
             try:
-                page = self.client.pages.retrieve(page_id=formatted_page_id)
+                import asyncio
+                import concurrent.futures
+                
+                loop = asyncio.get_event_loop()
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    page = await loop.run_in_executor(
+                        executor,
+                        self.client.pages.retrieve,
+                        formatted_page_id
+                    )
                 print(f"✅ Page found: {self._extract_page_title(page)}")
             except Exception as e:
                 raise ValueError(f"Could not access page {formatted_page_id}. Make sure the page is shared with your integration. Error: {str(e)}")
@@ -147,16 +199,20 @@ class NotionService:
     
     async def sync_user_pages(self, page_ids: List[str]) -> List[Dict]:
         """Sync multiple pages for a user"""
+        print(f"🔍 Starting sync_user_pages for {len(page_ids)} pages")
         all_documents = []
         
-        for page_id in page_ids:
+        for i, page_id in enumerate(page_ids):
             try:
+                print(f"🔍 Syncing page {i+1}/{len(page_ids)}: {page_id}")
                 documents = await self.sync_page(page_id)
+                print(f"✅ Page {page_id} synced, got {len(documents)} documents")
                 all_documents.extend(documents)
             except Exception as e:
                 print(f"❌ Error syncing page {page_id}: {e}")
                 continue
         
+        print(f"✅ sync_user_pages completed, total documents: {len(all_documents)}")
         return all_documents
     
     async def sync_database(self, database_id: str) -> List[Dict]:
@@ -232,30 +288,38 @@ class NotionService:
                 print(f"     Content length: {len(page_content)} characters")
                 print(f"     Content preview: {page_content[:100]}...")
             
-            # Process blocks and look for sub-pages
+            # Combine all blocks into a single document for better chunking
+            all_block_content = []
             for block in blocks:
                 # Process regular content blocks
                 if block.get("type") in ["paragraph", "heading_1", "heading_2", "heading_3", "bulleted_list_item", "numbered_list_item"]:
                     content = self._extract_block_content(block)
                     if content.strip():
-                        doc = {
-                            "page_content": content,
-                            "metadata": {
-                                "source": f"Notion: {page_title}",
-                                "title": page_title,
-                                "page_id": page_id,
-                                "block_id": block["id"],
-                                "block_type": block["type"],
-                                "source_type": "notion",
-                                "url": f"https://notion.so/{page_id.replace('-', '')}",
-                                "last_edited_time": page.get("last_edited_time"),
-                                "created_time": page.get("created_time")
-                            }
-                        }
-                        documents.append(doc)
-                        print(f"  📝 Created document from block {block['type']}: {content[:50]}...")
-                
-                # Check for sub-pages (child pages)
+                        all_block_content.append(content)
+                        print(f"  📝 Extracted block content: {block['type']} - {content[:50]}...")
+            
+            # Create a single document with all block content combined
+            if all_block_content:
+                combined_content = "\n\n".join(all_block_content)
+                doc = {
+                    "page_content": f"Title: {page_title}\n\nContent: {combined_content}",
+                    "metadata": {
+                        "source": f"Notion: {page_title}",
+                        "title": page_title,
+                        "page_id": page_id,
+                        "source_type": "notion",
+                        "url": f"https://notion.so/{page_id.replace('-', '')}",
+                        "last_edited_time": page.get("last_edited_time"),
+                        "created_time": page.get("created_time"),
+                        "block_count": len(all_block_content)
+                    }
+                }
+                documents.append(doc)
+                print(f"  📄 Created combined document with {len(all_block_content)} blocks")
+                print(f"     Total content length: {len(combined_content)} characters")
+            
+            # Process sub-pages (child pages) separately
+            for block in blocks:
                 if block.get("type") == "child_page":
                     try:
                         child_page_data = block.get("child_page", {})
@@ -492,16 +556,37 @@ class NotionService:
     async def _get_page_blocks(self, page_id: str) -> List[Dict[str, Any]]:
         """Get all blocks from a Notion page"""
         try:
+            import asyncio
+            import concurrent.futures
+            
             blocks = []
-            response = self.client.blocks.children.list(block_id=page_id)
+            
+            # Run the first API call in a thread pool
+            loop = asyncio.get_event_loop()
+            
+            def get_blocks(block_id, start_cursor=None):
+                if start_cursor:
+                    return self.client.blocks.children.list(
+                        block_id=block_id,
+                        start_cursor=start_cursor
+                    )
+                else:
+                    return self.client.blocks.children.list(block_id=block_id)
+            
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                response = await loop.run_in_executor(executor, get_blocks, page_id)
+            
             blocks.extend(response["results"])
             
             # Handle pagination
             while response.get("has_more"):
-                response = self.client.blocks.children.list(
-                    block_id=page_id,
-                    start_cursor=response["next_cursor"]
-                )
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    response = await loop.run_in_executor(
+                        executor,
+                        get_blocks,
+                        page_id,
+                        response["next_cursor"]
+                    )
                 blocks.extend(response["results"])
             
             return blocks

@@ -20,6 +20,7 @@ async def sync_notion(
     db: Session = Depends(get_db)
 ):
     """Sync content from specified Notion pages"""
+    print(f"🔄 Notion sync requested for {len(request.page_ids)} pages by user {user.user_id if user else 'unknown'}")
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     
@@ -31,6 +32,7 @@ async def sync_notion(
         notion_service = NotionService(user_token=user.notion_token)
         
         # Sync documents from specified pages
+        print(f"🔍 Starting sync for pages: {request.page_ids}")
         documents = await notion_service.sync_user_pages(request.page_ids)
         
         if not documents:
@@ -190,6 +192,7 @@ async def get_notion_embeddings(
     db: Session = Depends(get_db)
 ):
     """Get information about synced Notion pages and their embeddings"""
+    print(f"🔍 get_notion_embeddings called for user {user.user_id if user else 'unknown'}")
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     
@@ -197,75 +200,55 @@ async def get_notion_embeddings(
         raise HTTPException(status_code=400, detail="Notion not connected. Please connect your Notion account first.")
     
     try:
-        from app.services.vector_store import vector_store
+        # Get all Notion documents for this user using PostgreSQL
+        print("🔍 Searching for Notion embeddings...")
+        from app.services.postgres_vector_store import search_documents
         
-        # Search for all Notion documents for this user
-        search_filter = {
-            "user_id": user.user_id,
-            "source_type": "notion"
-        }
+        # Use a simple query to get all Notion documents for this user
+        results = await search_documents(
+            query="notion",  # Simple query to find Notion documents
+            top_k=1000,  # Get a large number to find all Notion docs
+            filter={
+                "user_id": user.user_id,
+                "source_type": "notion"
+            }
+        )
         
-        # Get all Notion documents for this user
-        try:
-            results = vector_store.client.search(
-                collection_name=vector_store.collection_name,
-                query_vector=[0.0] * 384,  # Dummy vector to get all documents
-                limit=1000,  # Get a large number to find all Notion docs
-                query_filter={
-                    "must": [
-                        {
-                            "key": "user_id",
-                            "match": {"value": user.user_id}
-                        },
-                        {
-                            "key": "source_type",
-                            "match": {"value": "notion"}
-                        }
-                    ]
-                },
-                with_payload=True
-            )
+        print(f"🔍 Found {len(results)} Notion documents")
+        
+        # Group by page_id to get unique pages
+        pages = {}
+        for result in results:
+            metadata = result.get("metadata", {})
+            page_id = metadata.get("page_id")
             
-            # Group by page_id to get unique pages
-            pages = {}
-            for result in results:
-                metadata = result.payload.get("metadata", {})
-                page_id = metadata.get("page_id")
+            if page_id:
+                if page_id not in pages:
+                    pages[page_id] = {
+                        "page_id": page_id,
+                        "title": metadata.get("title", f"Page {page_id[:8]}..."),
+                        "url": metadata.get("url", f"https://notion.so/{page_id.replace('-', '')}"),
+                        "chunks_count": 0,
+                        "last_edited_time": metadata.get("last_edited_time"),
+                        "created_time": metadata.get("created_time"),
+                        "total_score": 0
+                    }
                 
-                if page_id:
-                    if page_id not in pages:
-                        pages[page_id] = {
-                            "page_id": page_id,
-                            "title": metadata.get("title", f"Page {page_id[:8]}..."),
-                            "url": metadata.get("url", f"https://notion.so/{page_id.replace('-', '')}"),
-                            "chunks_count": 0,
-                            "last_edited_time": metadata.get("last_edited_time"),
-                            "created_time": metadata.get("created_time"),
-                            "total_score": 0
-                        }
-                    
-                    pages[page_id]["chunks_count"] += 1
-                    pages[page_id]["total_score"] += result.score or 0
-            
-            # Convert to list and sort by total score
-            pages_list = list(pages.values())
-            pages_list.sort(key=lambda x: x["total_score"], reverse=True)
-            
-            return {
-                "user_id": user.user_id,
-                "total_pages": len(pages_list),
-                "total_chunks": sum(page["chunks_count"] for page in pages_list),
-                "pages": pages_list[:50]  # Return top 50 pages
-            }
-            
-        except Exception as e:
-            return {
-                "user_id": user.user_id,
-                "total_pages": 0,
-                "total_chunks": 0,
-                "pages": [],
-                "error": f"Failed to search Notion embeddings: {str(e)}"
-            }
+                pages[page_id]["chunks_count"] += 1
+                pages[page_id]["total_score"] += result.get("score", 0)
+        
+        # Convert to list and sort by total score
+        pages_list = list(pages.values())
+        pages_list.sort(key=lambda x: x["total_score"], reverse=True)
+        
+        print(f"✅ Returning {len(pages_list)} pages with {sum(page['chunks_count'] for page in pages_list)} total chunks")
+        
+        return {
+            "user_id": user.user_id,
+            "total_pages": len(pages_list),
+            "total_chunks": sum(page["chunks_count"] for page in pages_list),
+            "pages": pages_list[:50]  # Return top 50 pages
+        }
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting Notion embeddings: {str(e)}") 

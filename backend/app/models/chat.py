@@ -41,22 +41,15 @@ def get_database_url():
 
 engine = create_engine(
     get_database_url(),
-    connect_args={"check_same_thread": False} if "sqlite" in get_database_url() else {}
+    pool_pre_ping=True,  # Verify connections before use
+    pool_recycle=300,    # Recycle connections every 5 minutes
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Create tables
 def create_tables():
-    # Ensure database directory exists
-    db_url = get_database_url()
-    if db_url.startswith("sqlite:///"):
-        db_path = db_url.replace("sqlite:///", "")
-        if db_path != ":memory:":
-            db_dir = os.path.dirname(db_path)
-            if db_dir and not os.path.exists(db_dir):
-                os.makedirs(db_dir, exist_ok=True)
-    
+    # For PostgreSQL, we don't need to create directories
     Base.metadata.create_all(bind=engine)
 
 # Dependency to get database session

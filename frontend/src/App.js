@@ -162,6 +162,121 @@ function AppContent() {
     handleNotionCallback();
   }, [callbackProcessed, notionAuthInProgress, notionAuthRetryCount]); // Include all relevant dependencies
 
+  // Handle Notion OAuth redirect from backend (new flow)
+  useEffect(() => {
+    const handleNotionRedirect = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const status = urlParams.get('status');
+      const workspace = urlParams.get('workspace');
+      const message = urlParams.get('message');
+      
+      // Handle direct redirect from backend
+      if (status && !callbackProcessed && !callbackProcessedRef.current) {
+        console.log('🔄 Processing Notion OAuth redirect...');
+        console.log(`📊 Status: ${status}`);
+        
+        callbackProcessedRef.current = true;
+        setCallbackProcessed(true);
+        
+        // Clear URL parameters
+        window.history.replaceState({}, document.title, '/');
+        
+        if (status === 'success') {
+          console.log('✅ Notion connected successfully via redirect');
+          setNotionAuthInProgress(false);
+          setNotionAuthError(null);
+          setNotionAuthRetryCount(0);
+          
+          // Switch to dashboard tab
+          setActiveTab('dashboard');
+          
+          // Show success message
+          const successMessage = `Notion connected successfully! Connected to workspace: ${workspace || 'Unknown'}`;
+          showModal(
+            'Notion Connected!',
+            successMessage,
+            'success'
+          );
+          
+          // Refresh user profile and usage stats
+          try {
+            await refreshUserProfile();
+            await refreshUsage();
+            console.log('✅ User profile and usage stats refreshed');
+          } catch (error) {
+            console.error('❌ Failed to refresh user data:', error);
+          }
+          
+          return;
+        } else if (status === 'error') {
+          console.error('❌ Notion connection failed via redirect');
+          setNotionAuthInProgress(false);
+          setNotionAuthError(message || 'Failed to connect to Notion');
+          
+          // Show error message
+          showSnackbar(message || 'Failed to connect to Notion. Please try again.', 'error');
+          
+          return;
+        }
+      }
+    };
+    
+    handleNotionRedirect();
+  }, [callbackProcessed, refreshUserProfile, refreshUsage]);
+
+  // Polling mechanism for Notion connection status
+  useEffect(() => {
+    let pollInterval;
+    
+    if (notionAuthInProgress && !callbackProcessed) {
+      console.log('🔄 Starting Notion connection polling...');
+      
+      pollInterval = setInterval(async () => {
+        try {
+          console.log('🔍 Polling for Notion connection status...');
+          const profile = await refreshUserProfile();
+          
+          if (profile?.notion_connected) {
+            console.log('✅ Notion connection detected via polling');
+            setNotionAuthInProgress(false);
+            setNotionAuthError(null);
+            setNotionAuthRetryCount(0);
+            setCallbackProcessed(true);
+            callbackProcessedRef.current = true;
+            
+            // Switch to dashboard tab
+            setActiveTab('dashboard');
+            
+            // Show success message
+            showModal(
+              'Notion Connected!',
+              'Notion connected successfully! You can now sync your pages and chat with your content.',
+              'success'
+            );
+            
+            // Refresh usage stats
+            try {
+              await refreshUsage();
+            } catch (error) {
+              console.error('❌ Failed to refresh usage stats:', error);
+            }
+            
+            // Clear polling
+            clearInterval(pollInterval);
+          }
+        } catch (error) {
+          console.error('❌ Polling error:', error);
+        }
+      }, 2000); // Poll every 2 seconds
+    }
+    
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [notionAuthInProgress, callbackProcessed, refreshUserProfile, refreshUsage]);
+
   // Auto-reset OAuth state after timeout
   useEffect(() => {
     let timeoutId;

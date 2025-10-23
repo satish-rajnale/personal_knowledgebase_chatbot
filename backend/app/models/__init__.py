@@ -9,6 +9,7 @@ from .base import Base
 # Import all models to ensure they are registered
 from .user import User, UsageLog, NotionSync
 from .chat import ChatSession, ChatMessage
+from .vector import DocumentChunk
 
 # Export all models
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "UsageLog", 
     "NotionSync",
     "ChatSession",
-    "ChatMessage"
+    "ChatMessage",
+    "DocumentChunk"
 ] 

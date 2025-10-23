@@ -3,13 +3,18 @@
 # Create data directory if it doesn't exist
 mkdir -p /app/data
 
-# Create database file if it doesn't exist
-touch /app/data/chat_history.db
-chmod 666 /app/data/chat_history.db
-
 # Create uploads directory if it doesn't exist
 mkdir -p /app/uploads
 chmod 777 /app/uploads
+
+# Wait for PostgreSQL database to be ready
+echo "🔍 Waiting for PostgreSQL database to be ready..."
+python wait_for_db.py
+
+if [ $? -ne 0 ]; then
+    echo "❌ Database connection failed, exiting..."
+    exit 1
+fi
 
 # Initialize vector store (this will be handled by the startup event in main.py)
 echo "🚀 Starting application with automatic vector store initialization..."

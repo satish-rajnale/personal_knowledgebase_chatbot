@@ -1,20 +1,23 @@
 version: '3.8'
 
 services:
-  # Qdrant Vector Database
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: knowledgebase-qdrant
+  # PostgreSQL with pgvector
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: knowledgebase-postgres
     ports:
-      - "6333:6333"
-      - "6334:6334"
+      - "5432:5432"
     volumes:
-      - qdrant_storage:/qdrant/storage
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
     environment:
-      - QDRANT__SERVICE__HTTP_PORT=6333
-      - QDRANT__SERVICE__GRPC_PORT=6334
+      - POSTGRES_DB=knowledgebase
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
     networks:
       - knowledgebase-network
+    restart: unless-stopped
 
   # FastAPI Backend
   backend:
@@ -24,19 +27,26 @@ services:
     container_name: knowledgebase-backend
     ports:
       - "8000:8000"
+      - "5678:5678"  # Debug port
     volumes:
       - ./backend:/app
       - ./uploads:/app/uploads
       - database_data:/app/data
+      - models_cache:/app/.cache
     environment:
       - CORS_ORIGINS=http://localhost:3000
+      - DATABASE_URL=postgresql://user:password@postgres:5432/knowledgebase
+      - FRONTEND_URL=http://localhost:3000
+      - DEBUG=true
+      - DEBUG_WAIT_FOR_ATTACH=false  # Set to true to wait for debugger attachment
     env_file:
       - .env
-    depends_on:
-      - qdrant
+    depends_on: [postgres]
     networks:
       - knowledgebase-network
     restart: unless-stopped
+    # Uncomment the line below to use debug server instead of regular server
+    # command: python debug_server.py
 
   # React Frontend
   frontend:
@@ -59,8 +69,9 @@ services:
     restart: unless-stopped
 
 volumes:
-  qdrant_storage:
+  postgres_data:
   database_data:
+  models_cache:
 
 networks:
   knowledgebase-network:

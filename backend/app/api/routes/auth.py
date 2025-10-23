@@ -349,19 +349,21 @@ async def notion_callback_get(
         # Clean up the state after successful processing
         oauth_states.pop(state, None)
         
-        # If successful, redirect to mobile app with success status
+        # If successful, redirect to frontend with success status
         from app.core.config import settings
-        mobile_redirect_uri = settings.NOTION_MOBILE_REDIRECT_URI
-        success_url = f"{mobile_redirect_uri}?status=success&workspace={result.get('workspace_name', 'Unknown')}"
+        # Use frontend URL for redirect (fallback to mobile redirect if not set)
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        success_url = f"{frontend_url}?status=success&workspace={result.get('workspace_name', 'Unknown')}"
         
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=success_url)
         
     except Exception as e:
-        # If failed, redirect to mobile app with error status
+        # If failed, redirect to frontend with error status
         from app.core.config import settings
-        mobile_redirect_uri = settings.NOTION_MOBILE_REDIRECT_URI
-        error_url = f"{mobile_redirect_uri}?status=error&message={str(e)}"
+        # Use frontend URL for redirect (fallback to mobile redirect if not set)
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        error_url = f"{frontend_url}?status=error&message={str(e)}"
         
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=error_url)
