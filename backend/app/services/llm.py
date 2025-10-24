@@ -62,6 +62,8 @@ You have access to the user's personal information from their documents, and you
 6. **Structure your response** with clear sections
 7. **Use emojis** sparingly but effectively (📋, 💡, 🔍, etc.)
 8. **Make it scannable** with proper spacing and formatting
+9. **AVOID raw markdown tables** - use bullet points and sections instead
+10. **For checklists and summaries**, use structured bullet points with status indicators
 
 When answering:
 1. First, summarize the user's current situation from their documents
@@ -69,6 +71,10 @@ When answering:
 3. Be clear about what information comes from their documents vs. general knowledge
 4. If making recommendations, explain your reasoning
 5. Use a conversational but professional tone
+6. **For checklists and summaries**, format like this:
+   - ✅ **Task Name**: Description of what to do
+   - ⚠️ **Important Note**: Any warnings or considerations
+   - 📋 **Next Steps**: Clear action items
 
 Context from user's documents:
 {context_text if context_text != "No relevant documents found." else "No specific documents provided."}
@@ -89,26 +95,27 @@ Please provide a comprehensive, well-formatted response that combines informatio
         context_text = self._prepare_context(context)
         
         prompt = f"""You are a helpful AI assistant that answers questions based on the provided context. 
-Please use only the information from the context to answer the user's question. 
-If the context doesn't contain enough information to answer the question, please say so.
+Use the following context to answer the question. If the answer isn't in the context, say you don't know.
 
-**IMPORTANT: Format your response to be visually appealing and well-structured:**
-
-1. **Use clear headings** with markdown formatting (##, ###)
-2. **Use bullet points** (• or -) for lists
-3. **Use bold text** (**text**) for emphasis
-4. **Use code blocks** for policy numbers or technical details
-5. **Structure your response** with clear sections
-6. **Make it scannable** with proper spacing
-
-Context:
+**Context:**
 {context_text}
 
-User Question: {query}
+**Question:** {query}
 
-Please provide a helpful and accurate response based on the context above. 
-If possible, cite the specific documents you used to form your answer.
-Format your response to be visually appealing and easy to read."""
+**Instructions:**
+- Answer based only on the provided context
+- If the context doesn't contain enough information, say so clearly
+- Use clear, well-structured formatting with headings, bullet points, and emphasis
+- Cite specific sources when possible
+- Keep your response concise but comprehensive
+- If the question is about a specific topic, focus on that topic in your answer
+- **AVOID raw markdown tables** - use bullet points and sections instead
+- **For checklists and summaries**, use structured bullet points with status indicators like:
+  - ✅ **Task Name**: Description
+  - ⚠️ **Important Note**: Warnings
+  - 📋 **Next Steps**: Action items
+
+Please provide a helpful and accurate response."""
 
         if self.provider == "openrouter":
             return await self._call_openrouter(prompt)
@@ -118,15 +125,39 @@ Format your response to be visually appealing and easy to read."""
             raise ValueError(f"Unsupported provider: {self.provider}")
     
     def _prepare_context(self, context: List[Dict[str, Any]]) -> str:
-        """Prepare context from retrieved documents"""
+        """Prepare structured context from retrieved documents"""
         if not context:
             return "No relevant documents found."
         
         context_parts = []
         for i, doc in enumerate(context, 1):
-            source_info = doc.get("metadata", {}).get("source", "Unknown source")
+            # Extract metadata
+            metadata = doc.get("metadata", {})
+            source = metadata.get("source", "Unknown source")
+            section = metadata.get("section", "")
+            page_number = metadata.get("page_number", "")
+            chunk_type = metadata.get("chunk_type", "text")
+            
+            # Get content
             content = doc.get("text", "")
-            context_parts.append(f"Document {i} (Source: {source_info}):\n{content}\n")
+            
+            # Build source description
+            source_desc = source
+            if section:
+                source_desc += f" - {section}"
+            if page_number:
+                source_desc += f" (Page {page_number})"
+            if chunk_type != "text":
+                source_desc += f" [{chunk_type}]"
+            
+            # Add relevance score if available
+            score = doc.get("score", 0.0)
+            if score > 0:
+                source_desc += f" (Relevance: {score:.2f})"
+            
+            # Format the context entry
+            context_entry = f"Source {i}: {source_desc}\n{content}\n"
+            context_parts.append(context_entry)
         
         return "\n".join(context_parts)
 

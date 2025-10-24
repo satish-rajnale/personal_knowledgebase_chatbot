@@ -119,11 +119,11 @@ async def chat(
 ):
     """Send a message and get AI response with RAG"""
     try:
-        # Check usage limits if user is authenticated
+        # Check usage limits if user is authenticated and limit is enabled
         auth_service = AuthService()
         if user:
             usage = auth_service.check_daily_usage_limit(db, user.user_id)
-            if not usage["can_make_query"]:
+            if not usage["can_make_query"] and usage["limit_enabled"]:
                 raise HTTPException(
                     status_code=429, 
                     detail=f"Daily query limit exceeded. You have used {usage['daily_query_count']}/{usage['daily_limit']} queries today."

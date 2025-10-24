@@ -51,7 +51,7 @@ async def upload_file(
             )
         
         # Add to vector store
-        await add_documents_to_store(documents, source_type="upload")
+        await add_documents_to_store(documents, source_type="UPLOAD")
         
         return {
             "message": f"File '{file.filename}' uploaded and processed successfully",
@@ -115,7 +115,7 @@ async def upload_multiple_files(
                 
                 if documents:
                     # Add to vector store
-                    await add_documents_to_store(documents, source_type="upload")
+                    await add_documents_to_store(documents, source_type="UPLOAD")
                     
                     results.append({
                         "filename": file.filename,

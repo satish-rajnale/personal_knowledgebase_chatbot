@@ -103,16 +103,24 @@ class AuthService:
             user.last_query_reset = now
             db.commit()
         
-        # Check if user has exceeded limit
-        daily_limit = settings.DAILY_QUERY_LIMIT
-        remaining_queries = max(0, daily_limit - user.daily_query_count)
+        # Check if user has exceeded limit (only if limit is enabled)
+        if settings.ENABLE_QUERY_LIMIT:
+            daily_limit = settings.DAILY_QUERY_LIMIT
+            remaining_queries = max(0, daily_limit - user.daily_query_count)
+            can_make_query = user.daily_query_count < daily_limit
+        else:
+            # Query limit is disabled - allow unlimited queries
+            daily_limit = 0  # Set to 0 to indicate unlimited
+            remaining_queries = -1  # -1 indicates unlimited
+            can_make_query = True
         
         return {
             "daily_query_count": user.daily_query_count,
             "daily_limit": daily_limit,
             "remaining_queries": remaining_queries,
-            "can_make_query": user.daily_query_count < daily_limit,
-            "total_queries": user.total_queries
+            "can_make_query": can_make_query,
+            "total_queries": user.total_queries,
+            "limit_enabled": settings.ENABLE_QUERY_LIMIT
         }
     
     def increment_usage(self, db: Session, user_id: str, action: str, details: Optional[Dict] = None):

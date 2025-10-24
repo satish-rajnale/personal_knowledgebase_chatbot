@@ -277,7 +277,7 @@ class NotionService:
                         "source": f"Notion: {page_title}",
                         "title": page_title,
                         "page_id": page_id,
-                        "source_type": "notion",
+                        "source_type": "NOTION",
                         "url": f"https://notion.so/{page_id.replace('-', '')}",
                         "last_edited_time": page.get("last_edited_time"),
                         "created_time": page.get("created_time")
@@ -307,7 +307,7 @@ class NotionService:
                         "source": f"Notion: {page_title}",
                         "title": page_title,
                         "page_id": page_id,
-                        "source_type": "notion",
+                        "source_type": "NOTION",
                         "url": f"https://notion.so/{page_id.replace('-', '')}",
                         "last_edited_time": page.get("last_edited_time"),
                         "created_time": page.get("created_time"),

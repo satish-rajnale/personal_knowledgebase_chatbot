@@ -1,10 +1,12 @@
 import os
 import aiofiles
 from typing import List
-# Using simple dictionaries instead of LangChain Document objects
+import re
+# Using LangChain Document objects
 from pypdf import PdfReader
 import markdown
 from app.core.config import settings
+from app.services.langchain_service import langchain_service
 
 class DocumentProcessor:
     """Service for processing different document types"""
@@ -30,7 +32,7 @@ class DocumentProcessor:
     
     @staticmethod
     async def _process_pdf(file_path: str, filename: str) -> List[dict]:
-        """Process PDF file"""
+        """Process PDF file with LangChain"""
         try:
             reader = PdfReader(file_path)
             documents = []
@@ -44,7 +46,8 @@ class DocumentProcessor:
                             "source": filename,
                             "page": page_num + 1,
                             "file_type": "pdf",
-                            "total_pages": len(reader.pages)
+                            "total_pages": len(reader.pages),
+                            "source_type": "PDF"
                         }
                     }
                     documents.append(doc)
@@ -58,7 +61,7 @@ class DocumentProcessor:
     
     @staticmethod
     async def _process_txt(file_path: str, filename: str) -> List[dict]:
-        """Process text file"""
+        """Process text file with LangChain"""
         try:
             async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
                 content = await file.read()
@@ -68,7 +71,8 @@ class DocumentProcessor:
                 "metadata": {
                     "source": filename,
                     "file_type": "txt",
-                    "page": 1
+                    "page": 1,
+                    "source_type": "TXT"
                 }
             }
             
@@ -81,19 +85,18 @@ class DocumentProcessor:
     
     @staticmethod
     async def _process_markdown(file_path: str, filename: str) -> List[dict]:
-        """Process markdown file"""
+        """Process markdown file with LangChain"""
         try:
             async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
                 content = await file.read()
             
-            # Convert markdown to plain text (remove formatting)
-            # We'll keep the raw markdown for better context
             doc = {
                 "page_content": content,
                 "metadata": {
                     "source": filename,
                     "file_type": "markdown",
-                    "page": 1
+                    "page": 1,
+                    "source_type": "MARKDOWN"
                 }
             }
             
@@ -114,4 +117,26 @@ class DocumentProcessor:
         """Validate file type"""
         allowed_extensions = ['.pdf', '.txt', '.md']
         file_extension = os.path.splitext(filename)[1].lower()
-        return file_extension in allowed_extensions 
+        return file_extension in allowed_extensions
+    
+    @staticmethod
+    def _highlight_query_terms(text: str, query: str) -> str:
+        """Highlight query terms in text with HTML mark tags"""
+        if not query or not text:
+            return text
+        
+        # Split query into individual terms (case-insensitive)
+        query_terms = re.findall(r'\b\w+\b', query.lower())
+        
+        if not query_terms:
+            return text
+        
+        # Create a pattern to match whole words only
+        pattern = r'\b(' + '|'.join(re.escape(term) for term in query_terms) + r')\b'
+        
+        # Replace matches with highlighted version (case-insensitive)
+        def highlight_match(match):
+            return f'<mark>{match.group(0)}</mark>'
+        
+        highlighted_text = re.sub(pattern, highlight_match, text, flags=re.IGNORECASE)
+        return highlighted_text 

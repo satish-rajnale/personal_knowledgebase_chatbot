@@ -395,7 +395,7 @@ class PDFProcessor:
                 # Store in vector database
                 stored_chunks = await add_documents_to_store(
                     documents=documents,
-                    source_type="pdf_ocr",
+                    source_type="PDF",
                     user_id=user_id
                 )
             

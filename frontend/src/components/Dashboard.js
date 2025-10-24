@@ -91,6 +91,8 @@ const Dashboard = () => {
 
   const getUsagePercentage = () => {
     if (!usage) return 0;
+    // Handle unlimited queries (when limit is disabled)
+    if (usage.daily_limit === 0 || usage.remaining_queries === -1) return 0;
     return Math.round((usage.daily_query_count / usage.daily_limit) * 100);
   };
 
@@ -149,19 +151,27 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Queries Used</span>
                   <span className={`text-sm font-medium ${getUsageColor()}`}>
-                    {usage.daily_query_count} / {usage.daily_limit}
+                    {usage.daily_limit === 0 || usage.remaining_queries === -1 
+                      ? `${usage.daily_query_count} (Unlimited)` 
+                      : `${usage.daily_query_count} / ${usage.daily_limit}`}
                   </span>
                 </div>
                 
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      getUsagePercentage() >= 90 ? 'bg-red-500' :
-                      getUsagePercentage() >= 75 ? 'bg-yellow-500' : 'bg-green-500'
-                    }`}
-                    style={{ width: `${Math.min(getUsagePercentage(), 100)}%` }}
-                  />
-                </div>
+                {usage.daily_limit === 0 || usage.remaining_queries === -1 ? (
+                  <div className="w-full bg-green-200 rounded-full h-2">
+                    <div className="h-2 rounded-full bg-green-500 w-full" />
+                  </div>
+                ) : (
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        getUsagePercentage() >= 90 ? 'bg-red-500' :
+                        getUsagePercentage() >= 75 ? 'bg-yellow-500' : 'bg-green-500'
+                      }`}
+                      style={{ width: `${Math.min(getUsagePercentage(), 100)}%` }}
+                    />
+                  </div>
+                )}
                 
                 <div className="flex items-center justify-between text-sm text-gray-600">
                   <span>Total Queries</span>

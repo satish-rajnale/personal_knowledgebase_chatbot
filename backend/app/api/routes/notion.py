@@ -44,7 +44,7 @@ async def sync_notion(
         print("Suncing notion pages", documents)
         
         # Add to vector store with user_id
-        await add_documents_to_store(documents, source_type="notion", user_id=user.user_id)
+        await add_documents_to_store(documents, source_type="NOTION", user_id=user.user_id)
         
         # Log the sync operation
         auth_service = AuthService()
@@ -57,7 +57,7 @@ async def sync_notion(
             "message": f"Successfully synced {len(documents)} documents from {len(request.page_ids)} Notion pages",
             "documents_synced": len(documents),
             "pages_synced": len(request.page_ids),
-            "source": "notion"
+            "source": "NOTION"
         }
         
     except ValueError as e:
@@ -204,15 +204,44 @@ async def get_notion_embeddings(
         print("🔍 Searching for Notion embeddings...")
         from app.services.postgres_vector_store import search_documents
         
-        # Use a simple query to get all Notion documents for this user
-        results = await search_documents(
-            query="notion",  # Simple query to find Notion documents
-            top_k=1000,  # Get a large number to find all Notion docs
-            filter={
-                "user_id": user.user_id,
-                "source_type": "notion"
-            }
-        )
+        # Get all Notion documents directly from database (bypass relevance filtering)
+        from app.core.database import get_db
+        from sqlalchemy import text
+        import json
+        
+        db = next(get_db())
+        try:
+            # Direct database query to get all Notion documents for this user
+            query = text("""
+                SELECT id, text, document_metadata, source_type, source_id, source_url, 
+                       source_url, page_number, section_title, chunk_size, chunk_index
+                FROM document_chunks 
+                WHERE user_id = :user_id AND source_type = 'NOTION'
+                ORDER BY created_at DESC
+            """)
+            
+            result = db.execute(query, {"user_id": user.user_id})
+            
+            # Convert database results to the expected format
+            results = []
+            for row in result:
+                metadata = json.loads(row.document_metadata) if row.document_metadata else {}
+                results.append({
+                    "text": row.text,
+                    "metadata": metadata,
+                    "source_type": row.source_type,
+                    "score": 1.0,  # Set high score to ensure inclusion
+                    "source_info": {
+                        "source_id": row.source_id,
+                        "source_url": row.source_url,
+                        "page_number": row.page_number,
+                        "section_title": row.section_title,
+                        "chunk_size": row.chunk_size,
+                        "chunk_index": row.chunk_index
+                    }
+                })
+        finally:
+            db.close()
         
         print(f"🔍 Found {len(results)} Notion documents")
         

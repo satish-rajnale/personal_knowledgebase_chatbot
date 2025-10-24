@@ -1,0 +1,30 @@
+# Minimal requirements for the knowledge base chatbot
+# Avoiding LangChain version conflicts
+
+# Core dependencies
+fastapi>=0.100.0
+uvicorn>=0.20.0
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+pydantic>=2.0.0
+python-multipart>=0.0.6
+aiofiles>=23.0.0
+
+# Document processing
+pypdf>=3.0.0
+markdown>=3.4.0
+
+# Embeddings (using sentence-transformers directly)
+sentence-transformers>=2.2.2
+transformers>=4.30.0
+torch>=2.0.0
+
+# Optional: LangChain (if you want to try it)
+# langchain>=0.1.0
+# langchain-community>=0.0.20
+
+# Database
+pgvector>=0.2.0
+
+# HTTP client
+httpx>=0.24.0

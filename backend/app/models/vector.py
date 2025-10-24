@@ -20,16 +20,17 @@ class DocumentChunk(Base):
     document_metadata = Column(Text, nullable=True)  # JSON string of metadata
     
     # Source information
-    source_type = Column(String, nullable=False)  # "upload", "notion", etc.
+    source_type = Column(String, nullable=False)  # "UPLOAD", "NOTION", "PDF", "TXT", "MARKDOWN"
     source_id = Column(String, nullable=True)  # Original document/page ID
     source_url = Column(String, nullable=True)  # URL to original document
+    section_title = Column(String, nullable=True)  # Section title of the chunk
+    page_number = Column(Integer, nullable=True)  # Page number of the chunk
+    chunk_size = Column(Integer, nullable=True)  # Size of the chunk
+    chunk_index = Column(Integer, default=0)  # Order within document
     
     # Vector embedding (384 dimensions for sentence-transformers)
     embedding = Column(String, nullable=False)  # JSON string of embedding
     embedding_vector = Column(String, nullable=True)  # Will be converted to vector column in DB
-    
-    # Chunk information
-    chunk_index = Column(Integer, default=0)  # Order within document
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)

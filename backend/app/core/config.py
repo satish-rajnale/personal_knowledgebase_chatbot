@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     # Authentication
     JWT_SECRET: str = "change-me-in-env"
     DAILY_QUERY_LIMIT: int = 10  # Daily query limit per user
+    ENABLE_QUERY_LIMIT: bool = False  # Toggle to enable/disable daily query limit
     
     # File Upload
     MAX_FILE_SIZE: int = 10485760  # 10MB

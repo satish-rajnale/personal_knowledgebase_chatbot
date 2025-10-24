@@ -29,7 +29,7 @@ class EmbeddingService:
     
     def get_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
-        Generate embeddings for a list of texts with aggressive fallback
+        Generate embeddings for a list of texts using sentence-transformers
         
         Args:
             texts: List of text strings to embed
@@ -44,44 +44,23 @@ class EmbeddingService:
             print(f"🔍 EmbeddingService: Processing {len(texts)} texts...")
             print(f"🔍 EmbeddingService: Model type: {type(self.model)}")
             
-            # For now, let's use a simple fallback to avoid hanging
-            # TODO: Investigate why sentence-transformers is hanging
-            print("🔄 EmbeddingService: Using fallback embeddings to avoid hanging")
-            import numpy as np
+            # Use sentence-transformers model directly
+            embeddings = self.model.encode(
+                texts,
+                normalize_embeddings=True,  # Normalize for cosine similarity
+                batch_size=32,
+                show_progress_bar=False
+            )
             
-            # Generate simple hash-based embeddings for consistency
-            embeddings = []
-            for text in texts:
-                # Create a simple hash-based embedding for consistency
-                import hashlib
-                hash_obj = hashlib.md5(text.encode())
-                hash_bytes = hash_obj.digest()
-                
-                # Convert hash to 384-dimensional vector
-                embedding = []
-                for i in range(0, len(hash_bytes), 2):
-                    if i + 1 < len(hash_bytes):
-                        val = (hash_bytes[i] << 8) + hash_bytes[i + 1]
-                    else:
-                        val = hash_bytes[i] << 8
-                    embedding.append((val / 65535.0) * 2 - 1)  # Normalize to [-1, 1]
-                
-                # Pad or truncate to 384 dimensions
-                while len(embedding) < 384:
-                    embedding.extend(embedding[:min(384 - len(embedding), len(embedding))])
-                embedding = embedding[:384]
-                
-                embeddings.append(embedding)
+            # Convert to list of lists
+            embeddings_list = embeddings.tolist()
             
-            print(f"✅ Generated {len(embeddings)} fallback embeddings with {len(embeddings[0])} dimensions")
-            return embeddings
+            print(f"✅ Generated {len(embeddings_list)} embeddings with {len(embeddings_list[0])} dimensions")
+            return embeddings_list
             
         except Exception as e:
             print(f"❌ Error generating embeddings: {e}")
-            # Final fallback to random embeddings
-            print("🔄 Using random fallback embeddings")
-            import numpy as np
-            return [np.random.rand(self.dimensions).tolist() for _ in texts]
+            raise RuntimeError(f"Failed to generate embeddings: {e}")
     
     def get_embedding_dimensions(self) -> int:
         """Get the number of dimensions for embeddings"""

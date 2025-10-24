@@ -43,7 +43,7 @@ async def test_notion_sync():
                         "page_id": "test-page-123",
                         "title": "Test Page",
                         "url": "https://notion.so/test-page-123",
-                        "source_type": "notion"
+                        "source_type": "NOTION"
                     }
                 }
             ]
@@ -51,7 +51,7 @@ async def test_notion_sync():
             print(f"🔍 Testing with {len(mock_documents)} mock documents...")
             result = await postgres_vector_store.add_documents(
                 mock_documents, 
-                source_type="notion", 
+                source_type="NOTION", 
                 user_id="debug-user-123"
             )
             print(f"✅ Mock sync completed: {len(result)} chunks added")
@@ -75,7 +75,7 @@ async def test_notion_sync():
                 if documents:
                     result = await postgres_vector_store.add_documents(
                         documents, 
-                        source_type="notion", 
+                        source_type="NOTION", 
                         user_id="debug-user-123"
                     )
                     print(f"✅ Real sync completed: {len(result)} chunks added")
